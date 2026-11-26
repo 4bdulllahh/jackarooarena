@@ -18,7 +18,7 @@ M2-M3 (rules) and M8-M16 (look and feel).
 | --- | --- |
 | Folder | `E:\Github Repos\jackarooarena`, branch `main` |
 | Remote | https://github.com/4bdulllahh/jackarooarena |
-| Live site | not released yet |
+| Live site | https://jackarooarena.abdullahkamran823.workers.dev (0.1.0, deployed 2026-11-26) |
 | CI | `.github/workflows/ci.yml`: `npm run check` on every push to `main` |
 
 ## Starting a session
@@ -116,7 +116,7 @@ browser and take a screenshot.
 | G5 | Characters: smoother faceless heads, hair, beards, shemagh folds, hands with fingers holding cards, phone and tea | M | ✅ done |
 | M15 | Settings (Master/Effects/Taunts volume, Graphics Low/Med/High), How to play pages on the phone, Esc raises the phone in game | M | ✅ done |
 | M16 | Logo (full + small icon), favicon, share image | S | ✅ done |
-| M17 | Deploy to Cloudflare with domain, release 0.1.0 | S | next |
+| M17 | Deploy to Cloudflare (free workers.dev for now), release 0.1.0 | S | ✅ done |
 
 ## Usage log
 
@@ -149,7 +149,8 @@ browser and take a screenshot.
 - **G5:** see the `players.ts` row. The phone hand holds the bottom left corner with fingers behind; the tea hand holds the istikana from the side (Euler order `ZYX` so fingers point away and curl round the glass).
 - **M15:** Home has How to play (8 pages on the phone, `para` rows wrap text, Next/Back, Esc back home) and Settings: Master/Effects/Taunts sliders (`range` rows: click, drag or arrow keys; `sound.ts` has master + effects + taunts gain nodes, saved as `volume:<channel>`), Graphics Low/Medium/High (saves `graphics` and reloads). In a game, Esc raises the phone as a pause menu (Play and Chaos hidden, Back to the game shown); Esc on the home screen lowers it. Clicks on the raised phone never reach the board. Bloom threshold is 1, so only lights glow.
 - **M16:** logo, favicon and share image in `public/`, linked from `index.html` (description, theme colour, Open Graph and Twitter tags). `og:image` is relative until the domain is known.
-- **Next:** M17: ask the user for the domain, make `og:image` absolute, release notes, README, version tag, then deploy only after the user says yes.
+- **M17:** released 0.1.0 on the free workers.dev address (the user chose it; a custom domain can be added later with a `routes` entry in `wrangler.jsonc`). Release notes in `docs/releases/v0.1.0.md`, README with screenshots, roadmap Done table, tag `v0.1.0`. Live checks passed: `/api/health`, room create, browser create + start game over wss. `og:image` is absolute (change it if the domain changes). Wrangler is logged in on this PC.
+- **Next:** the milestone plan is finished. Ask the user what's next (roadmap: last move log, Chaos mode, more player counts, board shapes, Steam).
 - **Waiting on the user's feedback:** the look of the majlis (M8), neighbours' heads cut off at the screen edges (M10), how the sounds sound (M12), taunt wording (M13), the logo (M16), the new graphics G1-G5 (run it on a real browser and check fps on Low/Medium/High: `?q=low`).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.

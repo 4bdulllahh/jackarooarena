@@ -18,3 +18,9 @@
 
 | Item | Version |
 | --- | --- |
+| Online rooms with codes, bots, reconnect, rematch | 0.1.0 |
+| Full upgraded Levant rules on a server nobody can cheat | 0.1.0 |
+| 3D majlis with lighting, shadows and a soft retro filter | 0.1.0 |
+| Phone menu, How to play, settings (volume, graphics) | 0.1.0 |
+| Taunts and procedural sounds | 0.1.0 |
+| Logo, favicon, share image | 0.1.0 |
