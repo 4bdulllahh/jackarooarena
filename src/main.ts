@@ -5,6 +5,7 @@ import { applyPlay, newGame } from './domain/game';
 import { startLobbyUi } from './lobby/ui';
 import { BOARD_TOP, Board } from './scene/board';
 import { buildMajlis } from './scene/majlis';
+import { Players } from './scene/players';
 import { Retro, snapVertices } from './scene/retro';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
@@ -17,7 +18,8 @@ scene.background = new THREE.Color('#1a0f08');
 scene.fog = new THREE.Fog('#2a170c', 6, 14);
 const majlis = buildMajlis();
 const board = new Board();
-scene.add(majlis.group, board.group);
+const players = new Players();
+scene.add(majlis.group, board.group, players.group);
 snapVertices(scene);
 
 // Development views: `?cam=overview` (corner of the room), `?cam=top` (straight down on the board).
@@ -50,11 +52,13 @@ addEventListener('resize', resize);
 resize();
 
 const look = new THREE.Vector3();
+let turn: number | null = null;
 renderer.setAnimationLoop((t) => {
   camera.position.set(eye.x + Math.sin(t / 2700) * 0.015, eye.y + Math.sin(t / 1900) * 0.008, eye.z);
   camera.lookAt(rig.localToWorld(look.copy(target)));
   majlis.update(t);
   board.update(t);
+  players.update(t, turn);
   retro.render(scene, camera);
 });
 
@@ -65,8 +69,15 @@ fetch('/api/health')
   .then((text) => (status.textContent = text));
 
 startLobbyUi(document.querySelector('#lobby')!, {
-  onSeat: (seat) => (rig.rotation.y = (seat * Math.PI) / 2),
-  onGame: (view) => board.setPositions(view.marbles),
+  onSeat: (seat) => {
+    rig.rotation.y = (seat * Math.PI) / 2;
+    players.setSeat(seat);
+  },
+  onGame: (view) => {
+    board.setPositions(view.marbles);
+    players.setCards(view);
+    turn = view.winner === null ? view.turn : null;
+  },
 });
 
 if (params.has('demo')) {
@@ -76,5 +87,7 @@ if (params.has('demo')) {
     const actor = (game.pending?.kind === 'pick' ? game.pending.by : game.turn) as Player;
     game = applyPlay(game, actor, botPlay(game, actor, Math.random), Math.random)!;
     board.setPositions(game.marbles);
+    players.setCards({ hand: game.hands[0]!, handSizes: game.hands.map((h) => h.length), turn: game.turn });
+    turn = game.turn;
   }, 700);
 }

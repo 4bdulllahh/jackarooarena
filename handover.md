@@ -46,6 +46,7 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/main.ts` | Client entry: renderer, majlis + board, camera rig turned to your seat. Dev URL options: `?cam=overview`, `?cam=top`, `?demo` (local bot game on the 3D board) |
 | `src/scene/board.ts` | 3D board: grooves, numbers, coloured starts, home lanes, bases and centre star painted on one canvas texture; 16 marbles. `setPositions(marbles)` animates hole-by-hole hops (kills fly back to base after the killer lands); `onLand(marble)` hook for sounds; `route` tested |
 | `src/scene/majlis.ts` | The room: walls with arch niches and star frieze, wood ceiling and beams, carpet, Sadu floor seating along the walls, low round table (`TABLE_HEIGHT` 0.34, `TABLE_RADIUS` 0.8) with 4 player cushions, brass chandelier. 2 lights only (hemisphere + chandelier point light) |
+| `src/scene/players.ts` | `Players`: 4 faceless low-poly heads (hair/shemagh + beard styles), mitten hands holding a card fan (yours face up, others face down by `handSizes`), snack tray per seat (istikana tea, seeds, chips, water). `setSeat`, `setCards`, `update(time, turn)`; the player whose turn it is lifts their cards |
 | `src/scene/textures.ts` | Procedural canvas textures (plaster, wood, carpet, Sadu weave, frieze, brass), small and nearest-filtered |
 | `src/scene/retro.ts` | PS1/CRT look: renders at 240 px tall, upscales with 15-bit colour, dithering, vignette, scanlines; `snapVertices` adds the PS1 vertex wobble to every material |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (claims a free code in its Durable Object), `GET /api/rooms/:code` (exists/full/started), `/api/rooms/:code/ws` (WebSocket). `Room` Durable Object: hibernating WebSockets, lobby saved in storage under `lobby`, empty rooms deleted by an alarm after 1 hour |
@@ -94,8 +95,8 @@ browser and take a screenshot.
 | M7 | Online play: hidden hands, network moves, reconnect, 15 s turn timer then bot plays, rematch | M | ✅ done |
 | M8 | 3D majlis: room, low table, warm light, chandelier, PS1/CRT look | M | ✅ done |
 | M9 | 3D board: wooden board, grooves, marbles, movement | M | ✅ done |
-| M10 | Players: floating heads, hands with cards, snack trays | M | next |
-| M11 | Cameras (first person / top-down, `V`) + picking cards and marbles + legal move highlights | M | |
+| M10 | Players: floating heads, hands with cards, snack trays | M | ✅ done |
+| M11 | Cameras (first person / top-down, `V`) + picking cards and marbles + legal move highlights | M | next |
 | M12 | Procedural sound, mute toggle | M | |
 | M13 | Taunts / quick emotes with sounds | S | |
 | M14 | Phone menu: phone left hand, tea right, Play / Chaos (soon) / Settings, name, room code | M | |
@@ -115,12 +116,13 @@ browser and take a screenshot.
 | M6 | M | 17% | 19% |
 | M7 | M | 19% | 22% |
 | M8 | M | 22% | 24% |
-| M9 | M | 24% | ? |
+| M9 | M | 24% | 27% |
+| M10 | M | 27% | ? |
 
 ## Current state
 
-- **Last done:** M9. 3D board on the table, fed by the online game: marbles hop hole by hole, jump for exits, kills and swaps, and killed marbles fly back after the killer lands. Your own start faces you (board angle per seat, camera rig turns to your seat). Checked with headless screenshots (seat and `?cam=top`); headless timers are too slow to show `?demo` moving, so movement is covered by unit tests only. Ask the user to look at `/?demo`.
-- **Next:** M10 players in `src/scene/players.ts`: 3 other players as floating low-poly heads (hair, beard, no face) + 2 floating hands each, at their seat cushions (seat s sits at angle s*90°, see `table()` in majlis.ts); the hands hold a fan of face-down cards matching `handSizes`; your own hands at the bottom of your view hold your cards face up (`hand`, drawn with `cardName`). Snack tray beside each cushion: tea glass (istikana) on saucer, bowl of sunflower seeds, chips bowl, water bottle. Add a "resemblance is coincidence" line to the page footer.
+- **Last done:** M10. Players around the table: 3 floating heads watching the board, everyone's hands holding cards, your own cards face up at the bottom of your view, a snack tray by each cushion, and the "resemblance is coincidence" footer. Checked with headless screenshots (seat and overview, `?demo`). Your neighbours' heads are large and cut off at the screen edges from the seat view: ask the user if that's fine.
+- **Next:** M11 cameras + 3D play controls. `V` toggles seat view / top-down (lerp between the two; top-down needs `camera.up` set so your seat is at the bottom). Click a card in your fan to pick it (raycast on the card meshes), then the marbles it can move light up (from the server's `plays` list) and their target holes glow; click a marble/hole to play. Special plays (7 split, swap target, red 10/Q, burn) need a small chooser; keep the 2D button list as a fallback until then. Keyboard: number keys pick cards, Enter confirms (accessibility).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.
