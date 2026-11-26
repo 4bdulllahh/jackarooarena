@@ -26,21 +26,33 @@ body {
   margin: 0;
 }
 
+/* The menu form is drawn on the phone's screen; the real controls stay in the page, unseen. */
 #lobby {
   position: fixed;
-  top: 1rem;
-  left: 1rem;
-  max-width: 32rem;
-  max-height: calc(100vh - 2rem);
-  overflow: auto;
-  padding: 1rem;
-  background: #1a0f08dd;
-  border-radius: 0.5rem;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-#lobby label {
-  display: block;
-  margin-bottom: 0.5rem;
+#game {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.3rem 0.8rem;
+  background: #1a0f08dd;
+  border-radius: 0.3rem;
+}
+
+#turn {
+  margin: 0;
 }
 
 #choices {
@@ -103,6 +115,7 @@ body {
 
 #mute,
 #taunt,
+#rematch,
 #taunts button {
   padding: 0.35rem 0.7rem;
   background: #1a0f08dd;

@@ -1,4 +1,5 @@
-// shortcut: plain HTML lobby and 2D table so online play can be tested now; M9-M14 replace them.
+// The menu and lobby as a plain HTML form. It is visually hidden: the phone (scene/phone.ts) draws
+// its `data-row` elements on its screen, so keyboard and screen readers still use real controls.
 import { cardName } from '../domain/cards';
 import type { Play } from '../domain/game';
 import { MAX_NAME } from '../domain/lobby';
@@ -24,7 +25,7 @@ export interface GameView {
   plays: Play[];
 }
 
-const TEAM = ['Team A', 'Team B', 'Team A', 'Team B'];
+const TEAM = ['A', 'B', 'A', 'B'];
 const COLOR = ['red', 'blue', 'yellow', 'green'];
 
 export interface TableHooks {
@@ -42,29 +43,58 @@ export function startLobbyUi(
 ): { play(play: Play): void; taunt(id: TauntId): void } {
   const codeFromUrl = location.pathname.slice(1).toUpperCase();
   root.innerHTML = `
-    <form id="entry">
-      <label>Your name <input id="name" maxlength="${MAX_NAME}" required autocomplete="nickname" /></label>
-      <label>Room code <input id="code" maxlength="4" placeholder="ABCD" autocomplete="off" /></label>
-      <button type="submit" id="join">Join room</button>
-      <button type="button" id="create">Create room</button>
+    <section id="home">
+      <h1 data-row="title">JackarooArena</h1>
+      <button type="button" data-row data-go="entry">Play</button>
+      <button type="button" data-row disabled>Chaos (coming soon)</button>
+      <button type="button" data-row data-go="settings">Settings</button>
+    </section>
+    <form id="entry" hidden>
+      <h2 data-row="title">Play</h2>
+      <input id="name" data-row maxlength="${MAX_NAME}" aria-label="Your name" placeholder="Your name" autocomplete="nickname" />
+      <input id="code" data-row maxlength="4" aria-label="Room code" placeholder="Room code (ABCD)" autocomplete="off" />
+      <button type="submit" data-row>Join room</button>
+      <button type="button" data-row id="create">Create room</button>
+      <button type="button" data-row data-go="home">Back</button>
     </form>
+    <section id="settings" hidden>
+      <h2 data-row="title">Settings</h2>
+      <button type="button" data-row id="sound">Sound: on (M)</button>
+      <p data-row>More settings soon</p>
+      <button type="button" data-row data-go="home">Back</button>
+    </section>
     <section id="room" hidden>
-      <h2>Room <span id="room-code"></span> <button type="button" id="copy">Copy link</button></h2>
-      <ol id="seats"></ol>
-      <button type="button" id="start" hidden>Start game</button>
+      <h2 data-row="title">Room <span id="room-code"></span></h2>
+      <button type="button" data-row id="copy">Copy link</button>
+      <div id="seats"></div>
+      <button type="button" data-row id="start" hidden>Start game</button>
+      <p data-row id="wait" hidden>Waiting for the host</p>
     </section>
-    <section id="game" hidden>
-      <p id="turn" role="status"></p>
-      <button type="button" id="rematch" hidden>Rematch</button>
-    </section>
-    <p id="message" role="alert"></p>`;
+    <p id="message" data-row role="alert"></p>`;
 
-  const $ = <T extends HTMLElement>(id: string) => root.querySelector<T>(`#${id}`)!;
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const SCREENS = ['home', 'entry', 'settings', 'room'];
+  function show(screen: string) {
+    for (const s of SCREENS) $(s).hidden = s !== screen;
+    say('');
+    $(screen).querySelector<HTMLElement>('input, button:not(:disabled)')?.focus();
+  }
+  for (const button of root.querySelectorAll<HTMLElement>('[data-go]'))
+    button.onclick = () => show(button.dataset.go!);
+  root.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && ($('entry').hidden === false || $('settings').hidden === false)) show('home');
+  });
   const nameInput = $<HTMLInputElement>('name');
   const codeInput = $<HTMLInputElement>('code');
   nameInput.value = localStorage.getItem('name') ?? '';
-  if (isRoomCode(codeFromUrl)) codeInput.value = codeFromUrl;
+  codeInput.oninput = () => (codeInput.value = codeInput.value.toUpperCase());
   const say = (text: string) => ($('message').textContent = text);
+  show('home');
+  // A room link opens straight on the Play screen with the code filled in.
+  if (isRoomCode(codeFromUrl)) {
+    codeInput.value = codeFromUrl;
+    show('entry');
+  }
 
   let socket: WebSocket | null = null;
   let lobby: LobbyView | null = null;
@@ -82,7 +112,7 @@ export function startLobbyUi(
     socket.onopen = () =>
       socket!.send(JSON.stringify({ t: 'join', name, id: localStorage.getItem(`id:${code}`) }));
     socket.onclose = () => {
-      say('Connection lost. Reconnecting…');
+      say('Connection lost. Reconnecting...');
       setTimeout(() => connect(code), 2000);
     };
     socket.onmessage = (event) => {
@@ -90,8 +120,7 @@ export function startLobbyUi(
         GameView;
       if (msg.t === 'welcome') {
         localStorage.setItem(`id:${code}`, msg.id!);
-        $('entry').hidden = true;
-        $('room').hidden = false;
+        if ($('room').hidden) show('room');
         say('');
       } else if (msg.t === 'error') say(msg.message!);
       else if (msg.t === 'lobby') {
@@ -110,23 +139,19 @@ export function startLobbyUi(
   function renderSeats(view: LobbyView) {
     $('seats').replaceChildren(
       ...view.seats.map((seat, i) => {
-        const li = document.createElement('li');
-        const who = seat
-          ? seat.name + (seat.you ? ' (you)' : '')
-          : view.started
-            ? 'Bot'
-            : 'Empty (bot if no one sits)';
-        li.textContent = `${TEAM[i]}: ${who}${i === view.hostSeat ? ' · host' : ''} `;
-        if (!seat && !view.started) {
-          const sit = document.createElement('button');
-          sit.textContent = 'Sit here';
-          sit.onclick = () => send({ t: 'sit', seat: i });
-          li.append(sit);
-        }
-        return li;
+        const free = !seat && !view.started;
+        const row = document.createElement(free ? 'button' : 'p');
+        row.dataset.row = '';
+        row.dataset.seat = String(i);
+        const who = seat ? seat.name + (seat.you ? ' (you)' : '') : view.started ? 'Bot' : 'Sit here';
+        row.textContent = `${TEAM[i]}: ${who}${i === view.hostSeat ? ', host' : ''}`;
+        if (free) row.onclick = () => send({ t: 'sit', seat: i });
+        return row;
       }),
     );
-    $('start').hidden = view.started || view.you !== view.hostSeat;
+    const host = view.you === view.hostSeat;
+    $('start').hidden = view.started || !host;
+    $('wait').hidden = view.started || host;
   }
 
   function renderGame(view: GameView) {
@@ -150,8 +175,20 @@ export function startLobbyUi(
   }
   setInterval(renderTurn, 500);
 
+  function named(): boolean {
+    if (nameInput.value.trim()) return true;
+    say('Type your name first.');
+    nameInput.focus();
+    return false;
+  }
+
   async function roomExists(code: string): Promise<boolean> {
-    const info = (await (await fetch(`/api/rooms/${code}`)).json()) as { exists?: boolean; full?: boolean };
+    const res = await fetch(`/api/rooms/${code}`).catch(() => null);
+    if (!res?.ok) {
+      say('Could not reach the server. Try again.');
+      return false;
+    }
+    const info = (await res.json()) as { exists?: boolean; full?: boolean };
     const rejoining = localStorage.getItem(`id:${code}`) !== null;
     if (!info.exists) say('No room with that code.');
     else if (info.full && !rejoining) say('That room is full.');
@@ -160,14 +197,15 @@ export function startLobbyUi(
 
   $('entry').onsubmit = async (event) => {
     event.preventDefault();
+    if (!named()) return;
     const code = codeInput.value.trim().toUpperCase();
     if (!isRoomCode(code)) return say('Room codes are 4 letters.');
     if (await roomExists(code)) connect(code);
   };
   $('create').onclick = async () => {
-    if (!nameInput.reportValidity()) return;
-    const res = await fetch('/api/rooms', { method: 'POST' });
-    const body = (await res.json()) as { code?: string; error?: string };
+    if (!named()) return;
+    const res = await fetch('/api/rooms', { method: 'POST' }).catch(() => null);
+    const body = ((await res?.json().catch(() => null)) ?? {}) as { code?: string; error?: string };
     if (body.code) connect(body.code);
     else say(body.error ?? 'Could not create a room.');
   };

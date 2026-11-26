@@ -16,7 +16,7 @@ interface Look {
   shemagh: boolean; // red-and-white headscarf
 }
 
-const LOOKS: Look[] = [
+export const LOOKS: Look[] = [
   { skin: '#c68a5e', hair: '#1c120c', beard: 'full', shemagh: false },
   { skin: '#a8714a', hair: '#3a2416', beard: 'goatee', shemagh: true },
   { skin: '#d39b70', hair: '#2a1a10', beard: 'stubble', shemagh: false },
@@ -98,7 +98,7 @@ function head(look: Look): THREE.Group {
 }
 
 /** A simple mitten hand: palm plus a thumb. */
-function hand(skin: string, left: boolean): THREE.Group {
+export function hand(skin: string, left: boolean): THREE.Group {
   const group = new THREE.Group();
   const mat = lambert(skin);
   const palm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.025), mat);
@@ -240,6 +240,8 @@ export class Players {
   private seats: Seat[] = [];
   private me = 0;
   private selected: Card | null = null;
+  /** How far your own cards sit below their place (while the phone menu is up). */
+  ownDrop = 0;
 
   /** Your own hands ride on the camera, so your cards stay at the bottom of the view in every camera mode. */
   constructor(private camera: THREE.Camera) {
@@ -326,7 +328,8 @@ export class Players {
       s.hands.position.y =
         (i === this.me ? OWN_Y : OTHER_Y) +
         bob * (i === this.me ? 0.3 : 1) +
-        (turn === i && i !== this.me ? 0.03 : 0);
+        (turn === i && i !== this.me ? 0.03 : 0) -
+        (i === this.me ? this.ownDrop : 0);
     });
   }
 }

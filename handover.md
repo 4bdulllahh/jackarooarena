@@ -55,7 +55,8 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/scene/retro.ts` | PS1/CRT look: renders at 240 px tall, upscales with 15-bit colour, dithering, vignette, scanlines; `snapVertices` adds the PS1 vertex wobble to every material |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (claims a free code in its Durable Object), `GET /api/rooms/:code` (exists/full/started), `/api/rooms/:code/ws` (WebSocket). `Room` Durable Object: hibernating WebSockets, lobby saved in storage under `lobby`, empty rooms deleted by an alarm after 1 hour |
 | `src/domain/lobby.ts` | Lobby rules: join (name 1-14 letters), sit (pick seat/team), leave (host passes on), start (host only), `lobbyView` (no private ids) |
-| `src/lobby/ui.ts` | Temporary plain HTML lobby + 2D online table (legal plays as buttons, turn countdown, rematch, auto-reconnect). Replaced by the 3D table (M9-M11) and phone menu (M14) |
+| `src/lobby/ui.ts` | Menu and lobby as a visually hidden HTML form (screens `home`, `entry`, `settings`, `room`; rows marked `data-row`), plus networking: join/create, seats, start, auto-reconnect, turn bar and rematch (`#game` in `index.html`) |
+| `src/scene/phone.ts` | The phone menu: low-poly phone in your left hand on the camera, tea in your right hand (sips every 8 s). Its screen canvas (104x180, about 1:1 with the 240 px render) draws the form's visible `data-row` elements; clicks raycast to the screen and go to the real element; arrow keys move focus. `setUp(false)` lowers it when the game starts and `shown` drives your cards rising (`players.ownDrop`) |
 | `src/debug/board2d.ts` | 2D board drawing and `describePlay`, shared by the debug page and the temporary online table |
 | `wrangler.jsonc` | Worker config: static assets, SPA fallback for room links, `ROOMS` Durable Object binding |
 | `docs/reference/` | Board layout, groove look, logo meme references |
@@ -104,8 +105,8 @@ browser and take a screenshot.
 | M11 | Cameras (first person / top-down, `V`) + picking cards and marbles + legal move highlights | M | ✅ done |
 | M12 | Procedural sound, mute toggle | M | ✅ done |
 | M13 | Taunts / quick emotes with sounds | S | ✅ done |
-| M14 | Phone menu: phone left hand, tea right, Play / Chaos (soon) / Settings, name, room code | M | next |
-| M15 | How to play screen + settings (volume sliders, graphics low/high) | M | |
+| M14 | Phone menu: phone left hand, tea right, Play / Chaos (soon) / Settings, name, room code | M | ✅ done |
+| M15 | How to play screen + settings (volume sliders, graphics low/high) | M | next |
 | M16 | Logo (full + small icon), favicon, share image | S | |
 | M17 | Deploy to Cloudflare with domain, release 0.1.0 | S | |
 
@@ -125,13 +126,14 @@ browser and take a screenshot.
 | M10 | M | 27% | 29% |
 | M11 | M | 29% | 36% (many screenshots: keep image checks few) |
 | M12 | M | 36% | 38% |
-| M13 | S | 38% | ? (ask at the start of the next session) |
+| M13 | S | 38% | 40% |
+| M14 | M | 40% | ? (ask at the start of the next session) |
 
 ## Current state
 
-- **Last done:** M13. Taunts: `T` or the top-right button opens 6 presets (Hahaha, Yalla!, Facepalm, Khalas!, Clap clap, Too easy), each with a sound and a speech bubble over the speaker's head (yours above your cards). Server validates and rate-limits; bots gloat after kills. Also fixed: elements with `display: flex` now really hide (`[hidden]` rule in style.css). Verified with WebSocket script + Edge (menu, bubble, no errors).
-- **Next:** M14 phone menu. On load (no room yet), first-person seat view with your left hand holding a low-poly phone close to the camera and your right hand lifting the istikana now and then. The phone screen is a canvas texture showing the menu: title, Play (create/join), Chaos (Coming soon, greyed), Settings. Input: click the screen (raycast + UV to canvas coords) or keyboard; the name and room code still need real `<input>`s, so overlay a small HTML form exactly over the phone screen when typing. Replace `src/lobby/ui.ts`'s visible form with the phone; keep its networking. When the game starts, the phone lowers out of view and your cards come up.
-- **Waiting on the user's feedback:** the look of the majlis (M8), neighbours' heads cut off at the screen edges (M10), how the sounds sound (M12), taunt wording (M13).
+- **Last done:** M14. The menu is a phone in your left hand (tea in the right, a sip every 8 s): JackarooArena title, Play (name, room code, Join, Create, Back), Chaos (coming soon, greyed), Settings (sound toggle, Back), then the room screen (copy link, 4 seats with colour squares, Start or "Waiting for the host"). The real controls are a hidden HTML form, so Tab/Enter, arrow keys and screen readers work; clicks on the phone screen go to them. A room link opens on Play with the code filled in. When the game starts the phone drops out of view and your cards come up; the turn bar and Rematch are now a small HUD at the top. `V` is ignored while the phone is up. Checked in Edge: click and keyboard flows, room created, game started, no page errors.
+- **Next:** M15. Settings screen gets volume sliders and graphics low/high (the phone draws `data-row` rows: sliders need a new row kind in `phone.ts` `draw`, or use buttons like "Volume: 70% -/+"), plus a How to play screen (new section in `ui.ts` and a button on `home`). Maybe allow raising the phone in game (Esc) to reach Settings.
+- **Waiting on the user's feedback:** the look of the majlis (M8), neighbours' heads cut off at the screen edges (M10), how the sounds sound (M12), taunt wording (M13), the phone hands (low-poly mittens, they read as blocks up close) (M14).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** nothing. Everything up to M13 is on GitHub.

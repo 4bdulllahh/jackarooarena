@@ -6,6 +6,7 @@ import { startLobbyUi } from './lobby/ui';
 import { BOARD_TOP, Board } from './scene/board';
 import { Controls } from './scene/controls';
 import { buildMajlis } from './scene/majlis';
+import { Phone } from './scene/phone';
 import { Players } from './scene/players';
 import { Retro, snapVertices } from './scene/retro';
 import { isMuted, setMuted, sounds } from './scene/sound';
@@ -27,27 +28,29 @@ rig.add(camera);
 const majlis = buildMajlis();
 const board = new Board();
 const players = new Players(camera);
+const phone = new Phone(camera, canvas, document.querySelector('#lobby')!);
 scene.add(majlis.group, board.group, players.group, rig);
 snapVertices(scene);
 
 board.onLand = (_marble, final) => (final ? sounds.drop() : sounds.tick());
 board.onKill = () => sounds.clack();
 
-const muteButton = document.querySelector<HTMLButtonElement>('#mute')!;
+// The sound toggle is both a corner button and a row in the phone's Settings.
 const showMute = () => {
-  muteButton.textContent = isMuted() ? 'Sound: off (M)' : 'Sound: on (M)';
-  muteButton.setAttribute('aria-pressed', String(isMuted()));
+  for (const button of document.querySelectorAll<HTMLButtonElement>('#mute, #sound')) {
+    button.textContent = isMuted() ? 'Sound: off (M)' : 'Sound: on (M)';
+    button.setAttribute('aria-pressed', String(isMuted()));
+  }
 };
-muteButton.onclick = () => {
+const toggleMute = () => {
   setMuted(!isMuted());
   showMute();
 };
+document.querySelector<HTMLButtonElement>('#mute')!.onclick = toggleMute;
 addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement || e.key.toLowerCase() !== 'm') return;
-  setMuted(!isMuted());
-  showMute();
+  toggleMute();
 });
-showMute();
 
 /** Card flicks when cards leave hands or get dealt, and a chime when it becomes your turn. */
 let cardsHeld = -1;
@@ -75,7 +78,7 @@ let pose: keyof typeof POSES = startPose === 'overview' || startPose === 'top' ?
 const eye = POSES[pose].eye.clone();
 const target = POSES[pose].target.clone();
 addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLInputElement || e.key.toLowerCase() !== 'v') return;
+  if (e.target instanceof HTMLInputElement || e.key.toLowerCase() !== 'v' || phone.shown > 0.5) return;
   pose = pose === 'top' ? 'seat' : 'top';
   sounds.whoosh();
 });
@@ -84,6 +87,7 @@ function resize() {
   retro.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  phone.fit(camera.aspect);
 }
 addEventListener('resize', resize);
 resize();
@@ -105,6 +109,8 @@ renderer.setAnimationLoop((t) => {
   camera.lookAt(rig.localToWorld(look.copy(target)));
   majlis.update(t);
   board.update(t);
+  phone.update(t);
+  players.ownDrop = phone.shown * 0.4;
   players.update(t, turn);
   placeBubbles(t);
   retro.render(scene, camera);
@@ -182,6 +188,7 @@ const ui = startLobbyUi(document.querySelector('#lobby')!, {
     players.setSeat(seat);
   },
   onGame: (view) => {
+    phone.setUp(false);
     board.setPositions(view.marbles);
     players.setCards(view);
     controls.setState(view.marbles, seat, view.plays);
@@ -192,9 +199,12 @@ const ui = startLobbyUi(document.querySelector('#lobby')!, {
 });
 sendPlay = ui.play;
 sendTaunt = ui.taunt;
+document.querySelector<HTMLButtonElement>('#sound')!.onclick = toggleMute;
+showMute();
 
 if (params.has('demo')) {
   const auto = params.get('demo') === 'auto';
+  phone.setUp(false);
   let game: Game = newGame(Math.random);
   const show = () => {
     board.setPositions(game.marbles);
