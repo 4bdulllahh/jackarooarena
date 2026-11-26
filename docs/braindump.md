@@ -139,6 +139,9 @@ Status: kickoff done, plan approved. Work continues from handover.md.
 48. Any forward card that fits can enter home, K and 7-split included (nothing inside home
     is killed). Marbles in home move deeper with an exact count, no jumping inside home.
 49. **Winning:** the first team with all 8 marbles home wins.
+50. **Edge cases (confirmed after M2):** a K kills a marble standing on its home entrance and
+    enters home. A 5 sends your own or partner's marble into home and an opponent's past it,
+    no choice. A 5's jump limits use the moved marble's colour.
 
 Logo references: `docs/reference/logo-meme-layout.png`, `docs/reference/logo-meme-expressions.png`.
 

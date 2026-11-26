@@ -94,9 +94,6 @@ browser and take a screenshot.
 
 - **Last done:** M2. Board model and movement rules in `src/domain/board.ts` and `move.ts`, 31 tests from the user's own examples (jump limit, invincible start, K path kill, leaving base, 4-back shortcut, forced home entry, entrance block, 5 by partner vs opponent).
 - **Next:** M3. Cards and turns in `src/domain/`: map each card to the moves in `move.ts` (A, 2-9, 4 back, 5 on any marble, 7 split, black/red 10/J/Q, K), list legal plays per hand, burn and pass, a full game state (deck, deal 4-4-5, turn order, who starts each deck, teams, finished players moving their partner's marbles, win).
-- **Open questions (defaults in code, ask the user before M3 ends):**
-  - K reaching its home entrance while another marble sits on it: the code kills the blocker and enters home.
-  - A 5 on an opponent's marble never enters their home; on your own or partner's it must. Players can't choose.
-  - Jump limits for a 5 on someone else's marble use that marble's colour (it can't jump its own colour).
+- **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.
