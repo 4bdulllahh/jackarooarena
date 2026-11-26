@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { startLobbyUi } from './lobby/ui';
 
 // shortcut: placeholder scene to prove three.js and the Worker run, replaced in M8 (majlis).
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
@@ -34,3 +35,5 @@ fetch('/api/health')
   .then((r) => (r.ok ? 'Server: ok' : `Server: error ${r.status}`))
   .catch(() => 'Server: unreachable')
   .then((text) => (status.textContent = text));
+
+startLobbyUi(document.querySelector('#lobby')!);

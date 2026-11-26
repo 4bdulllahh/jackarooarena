@@ -20,3 +20,18 @@ body {
   bottom: 1rem;
   margin: 0;
 }
+
+#lobby {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  max-width: 24rem;
+  padding: 1rem;
+  background: #1a0f08dd;
+  border-radius: 0.5rem;
+}
+
+#lobby label {
+  display: block;
+  margin-bottom: 0.5rem;
+}

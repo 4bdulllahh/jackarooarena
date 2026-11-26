@@ -44,14 +44,20 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/domain/game.ts` | Whole game: `newGame`, `legalPlays(game, player)`, `applyPlay(game, player, play, random)` (null = illegal), `viewFor` (what one player may see). Plays: exit, move, king, split, swap, burnNext (red 10), pickNext (red Q), burn, pickBurn |
 | `debug.html`, `src/debug/main.ts` | Dev-only rules debug board at http://localhost:5173/debug.html: 2D canvas board, your legal plays as buttons, 3 bots, play log. Not in the production build (Vite only builds `index.html`) |
 | `src/main.ts` | Client entry: three.js scene (placeholder board until M8) |
-| `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (new code), `/api/rooms/:code` (asks the `Room` Durable Object) |
+| `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (claims a free code in its Durable Object), `GET /api/rooms/:code` (exists/full/started), `/api/rooms/:code/ws` (WebSocket). `Room` Durable Object: hibernating WebSockets, lobby saved in storage under `lobby`, empty rooms deleted by an alarm after 1 hour |
+| `src/domain/lobby.ts` | Lobby rules: join (name 1-14 letters), sit (pick seat/team), leave (host passes on), start (host only), `lobbyView` (no private ids) |
+| `src/lobby/ui.ts` | Temporary plain HTML lobby (name, create/join, seats, start, copy link). Replaced by the phone menu in M14 |
 | `wrangler.jsonc` | Worker config: static assets, SPA fallback for room links, `ROOMS` Durable Object binding |
 | `docs/reference/` | Board layout, groove look, logo meme references |
 
 ## Data and storage
 
-No database. A room's state lives in its Durable Object (from M6). Player settings will go in
-localStorage (M15).
+No database. A room's state lives in its Durable Object storage (`lobby` key; the game from M7).
+In the browser, localStorage keeps `name` and `id:<CODE>` (the private player id for that room,
+used to rejoin). Settings will go there too (M15).
+
+WebSocket messages, client to server: `{t:'join', name, id?}`, `{t:'sit', seat}`, `{t:'start'}`.
+Server to client: `{t:'welcome', id}`, `{t:'lobby', seats, hostSeat, you, started}`, `{t:'error', message}`.
 
 ## Rules that must not break
 
@@ -74,8 +80,8 @@ browser and take a screenshot.
 | M3 | Rules engine 2: all cards (7 split, 5, red 10/J/Q, K), burn/pass, deal 4-4-5, turn order, teams, win | M | ✅ done |
 | M4 | Bots: legal moves, prefer kills and sabotage | S | ✅ done |
 | M5 | Flat 2D debug board, play a full game to check rules | S | ✅ done |
-| M6 | Online rooms: create/join by code or link, name, pick seat/team, host starts, bots fill seats | M | next |
-| M7 | Online play: hidden hands, network moves, reconnect, 15 s turn timer then bot plays, rematch | M | |
+| M6 | Online rooms: create/join by code or link, name, pick seat/team, host starts, bots fill seats | M | ✅ done |
+| M7 | Online play: hidden hands, network moves, reconnect, 15 s turn timer then bot plays, rematch | M | next |
 | M8 | 3D majlis: room, low table, warm light, chandelier, PS1/CRT look | M | |
 | M9 | 3D board: wooden board, grooves, marbles, movement | M | |
 | M10 | Players: floating heads, hands with cards, snack trays | M | |
@@ -95,12 +101,13 @@ browser and take a screenshot.
 | M2 | M | 10% | 13% |
 | M3 | M | 13% | 15% |
 | M4 | S | 15% | 16% |
-| M5 | S | 16% | ? |
+| M5 | S | 16% | 17% |
+| M6 | M | 17% | ? |
 
 ## Current state
 
-- **Last done:** M5. Debug board: play red against 3 bots, or tick "Bot plays my seat" to watch a whole game. Checked with a headless Edge screenshot.
-- **Next:** M6 online rooms. Room `Durable Object` keeps the lobby: 4 seats, names (max 14 letters, validated on the server), host = first to join, seat/team picking, host starts, empty seats become bots. Clients connect by WebSocket to `/api/rooms/:code/ws` (use the Hibernation API: `ctx.acceptWebSocket`, so idle rooms cost nothing). `POST /api/rooms` should create the room in its Durable Object so random codes don't collide with live rooms. Messages validated on the server (hand-written checks or zod; zod isn't installed yet). Test the room logic as pure functions in `src/domain/` or `server/` with vitest.
+- **Last done:** M6. Rooms work end to end: create, join by code or `/CODE` link, names validated on the server, seat/team picking, host-only start, full and started rooms turn people away, private ids never sent to other players. Tested with a Node WebSocket script against `npm run dev` (create, bad name, non-host start, late join, missing room, id leak) and a screenshot.
+- **Next:** M7 online play. On start, the Room creates the `Game` (`newGame` with `crypto` random) with empty seats as bots, stores it, and sends each socket `viewFor(game, seat)`. New message `{t:'play', play}` checked with `applyPlay` (null = error). Bots and the 15 s turn timer run on the Durable Object alarm (one alarm: next bot move or timeout; on timeout `botPlay` plays for the human). Reconnect: after the start, a dropped player keeps their seat (rejoin with the stored id). Rematch: host sends `{t:'rematch'}` after a win. Update the debug board or add a temporary text view to play online.
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.
