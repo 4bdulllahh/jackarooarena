@@ -42,6 +42,7 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/domain/cards.ts` | Cards as ids 0..51 (`rankOf`, `suitOf`, `isRed`, `cardName`), shuffling |
 | `src/domain/bot.ts` | `botPlay(game, player, random)`: tries every legal play, keeps the one that leaves its team furthest ahead (kills, home, sabotage fall out of the score), saves A/K/5/7 on ties |
 | `src/domain/game.ts` | Whole game: `newGame`, `legalPlays(game, player)`, `applyPlay(game, player, play, random)` (null = illegal), `viewFor` (what one player may see). Plays: exit, move, king, split, swap, burnNext (red 10), pickNext (red Q), burn, pickBurn |
+| `debug.html`, `src/debug/main.ts` | Dev-only rules debug board at http://localhost:5173/debug.html: 2D canvas board, your legal plays as buttons, 3 bots, play log. Not in the production build (Vite only builds `index.html`) |
 | `src/main.ts` | Client entry: three.js scene (placeholder board until M8) |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (new code), `/api/rooms/:code` (asks the `Room` Durable Object) |
 | `wrangler.jsonc` | Worker config: static assets, SPA fallback for room links, `ROOMS` Durable Object binding |
@@ -72,8 +73,8 @@ browser and take a screenshot.
 | M2 | Rules engine 1: 72-tile board, base, home lane, movement, jump limit, kills, invincible start, home entrance block | M | ✅ done |
 | M3 | Rules engine 2: all cards (7 split, 5, red 10/J/Q, K), burn/pass, deal 4-4-5, turn order, teams, win | M | ✅ done |
 | M4 | Bots: legal moves, prefer kills and sabotage | S | ✅ done |
-| M5 | Flat 2D debug board, play a full game to check rules | S | next |
-| M6 | Online rooms: create/join by code or link, name, pick seat/team, host starts, bots fill seats | M | |
+| M5 | Flat 2D debug board, play a full game to check rules | S | ✅ done |
+| M6 | Online rooms: create/join by code or link, name, pick seat/team, host starts, bots fill seats | M | next |
 | M7 | Online play: hidden hands, network moves, reconnect, 15 s turn timer then bot plays, rematch | M | |
 | M8 | 3D majlis: room, low table, warm light, chandelier, PS1/CRT look | M | |
 | M9 | 3D board: wooden board, grooves, marbles, movement | M | |
@@ -93,12 +94,13 @@ browser and take a screenshot.
 | M1 | S | 9% | 10% |
 | M2 | M | 10% | 13% |
 | M3 | M | 13% | 15% |
-| M4 | S | 15% | ? |
+| M4 | S | 15% | 16% |
+| M5 | S | 16% | ? |
 
 ## Current state
 
-- **Last done:** M4. Bots score every legal play by team progress (base 0, distance from start, home holes) minus the opponents', so kills, going home and 5-sabotage come out naturally; red 10/Q get a bonus against opponents. Bot teams beat random teams in at least 16 of 20 games (tested).
-- **Next:** M5 flat 2D debug board: a `debug.html` page (dev only, not in the menu) drawing the 72-tile circle, bases and homes on a 2D canvas, your hand as buttons, bots playing the other 3 seats with a short delay, a log of plays. First step: add `debug.html` + `src/debug/main.ts` and add it as a second Vite input.
+- **Last done:** M5. Debug board: play red against 3 bots, or tick "Bot plays my seat" to watch a whole game. Checked with a headless Edge screenshot.
+- **Next:** M6 online rooms. Room `Durable Object` keeps the lobby: 4 seats, names (max 14 letters, validated on the server), host = first to join, seat/team picking, host starts, empty seats become bots. Clients connect by WebSocket to `/api/rooms/:code/ws` (use the Hibernation API: `ctx.acceptWebSocket`, so idle rooms cost nothing). `POST /api/rooms` should create the room in its Durable Object so random codes don't collide with live rooms. Messages validated on the server (hand-written checks or zod; zod isn't installed yet). Test the room logic as pure functions in `src/domain/` or `server/` with vitest.
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.

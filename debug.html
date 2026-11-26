@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JackarooArena: rules debug board</title>
+    <style>
+      body {
+        margin: 0;
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        background: #1a0f08;
+        color: #f3e2c4;
+        font:
+          14px system-ui,
+          sans-serif;
+      }
+      canvas {
+        background: #6b4423;
+        border-radius: 50%;
+        flex: none;
+      }
+      aside {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        min-width: 320px;
+        max-height: calc(100vh - 2rem);
+      }
+      #plays {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        max-height: 40vh;
+        overflow: auto;
+      }
+      button {
+        font: inherit;
+        padding: 0.3rem 0.6rem;
+        cursor: pointer;
+      }
+      #log {
+        flex: 1;
+        overflow: auto;
+        margin: 0;
+        padding-left: 1.25rem;
+        font-size: 12px;
+      }
+      h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="board" width="640" height="640" aria-label="Board"></canvas>
+    <aside>
+      <div>
+        <button id="new">New game</button>
+        <label><input type="checkbox" id="auto" /> Bot plays my seat</label>
+      </div>
+      <h2 id="status">Loading…</h2>
+      <div id="hand"></div>
+      <div id="plays"></div>
+      <h2>Log</h2>
+      <ol id="log" reversed></ol>
+    </aside>
+    <script type="module" src="/src/debug/main.ts"></script>
+  </body>
+</html>
