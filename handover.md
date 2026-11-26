@@ -40,6 +40,7 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/domain/board.ts` | Board constants: track 0..71, start = p*18, home entrance = start - 2 (tile 17), positions (`BASE` = -1, `HOME` + 0..3) |
 | `src/domain/move.ts` | `moveMarble` (normal and backward moves), `kingMove`, `exitMarble`, `fiveEntersHome`. Each returns new positions or `null` when illegal |
 | `src/domain/cards.ts` | Cards as ids 0..51 (`rankOf`, `suitOf`, `isRed`, `cardName`), shuffling |
+| `src/domain/bot.ts` | `botPlay(game, player, random)`: tries every legal play, keeps the one that leaves its team furthest ahead (kills, home, sabotage fall out of the score), saves A/K/5/7 on ties |
 | `src/domain/game.ts` | Whole game: `newGame`, `legalPlays(game, player)`, `applyPlay(game, player, play, random)` (null = illegal), `viewFor` (what one player may see). Plays: exit, move, king, split, swap, burnNext (red 10), pickNext (red Q), burn, pickBurn |
 | `src/main.ts` | Client entry: three.js scene (placeholder board until M8) |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (new code), `/api/rooms/:code` (asks the `Room` Durable Object) |
@@ -70,8 +71,8 @@ browser and take a screenshot.
 | M1 | Setup: Vite + three.js + TS, Worker + Durable Object skeleton, CI, docs | S | ✅ done |
 | M2 | Rules engine 1: 72-tile board, base, home lane, movement, jump limit, kills, invincible start, home entrance block | M | ✅ done |
 | M3 | Rules engine 2: all cards (7 split, 5, red 10/J/Q, K), burn/pass, deal 4-4-5, turn order, teams, win | M | ✅ done |
-| M4 | Bots: legal moves, prefer kills and sabotage | S | next |
-| M5 | Flat 2D debug board, play a full game to check rules | S | |
+| M4 | Bots: legal moves, prefer kills and sabotage | S | ✅ done |
+| M5 | Flat 2D debug board, play a full game to check rules | S | next |
 | M6 | Online rooms: create/join by code or link, name, pick seat/team, host starts, bots fill seats | M | |
 | M7 | Online play: hidden hands, network moves, reconnect, 15 s turn timer then bot plays, rematch | M | |
 | M8 | 3D majlis: room, low table, warm light, chandelier, PS1/CRT look | M | |
@@ -91,12 +92,13 @@ browser and take a screenshot.
 | --- | --- | --- | --- |
 | M1 | S | 9% | 10% |
 | M2 | M | 10% | 13% |
-| M3 | M | 13% | ? |
+| M3 | M | 13% | 15% |
+| M4 | S | 15% | ? |
 
 ## Current state
 
-- **Last done:** M3. Every card, burn and pass, red 10 (victim burns, that's their turn), red Q (blind pick, that's the victim's turn), 7 split incl. leftover to partner, finished players moving their partner, dealer rotating every deal (next player starts), fresh deck after 4-4-5, team win. 56 tests, including 30 random full games checking cards are conserved, one marble per tile and hands stay private. Random play always reaches a winner (about 590 turns).
-- **Next:** M4 bots in `src/domain/bot.ts`: `botPlay(game, player, random): Play` picks from `legalPlays`. Prefer: win, enter home, kill opponents (more if near their home), exit marbles, sabotage (5 pushing opponents past home, 5 pushing partner in, red J/Q/10), avoid killing own/partner, burn the least useful card. Test: bots beat random players most of the time.
+- **Last done:** M4. Bots score every legal play by team progress (base 0, distance from start, home holes) minus the opponents', so kills, going home and 5-sabotage come out naturally; red 10/Q get a bonus against opponents. Bot teams beat random teams in at least 16 of 20 games (tested).
+- **Next:** M5 flat 2D debug board: a `debug.html` page (dev only, not in the menu) drawing the 72-tile circle, bases and homes on a 2D canvas, your hand as buttons, bots playing the other 3 seats with a short delay, a log of plays. First step: add `debug.html` + `src/debug/main.ts` and add it as a second Vite input.
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.
