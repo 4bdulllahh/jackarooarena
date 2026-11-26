@@ -109,8 +109,8 @@ browser and take a screenshot.
 | M14 | Phone menu: phone left hand, tea right, Play / Chaos (soon) / Settings, name, room code | M | ✅ done |
 | G1 | Render pipeline: full resolution, softer CRT filter, no vertex wobble, Low/Med/High presets, sharp phone and cards, dev fps meter | M | ✅ done |
 | G2 | Lighting: chandelier shadows (Med/High), blob shadows (Low), bloom glow, lanterns/candles, better materials (shiny marbles, brass, glass) | M | ✅ done |
-| G3 | Room and table detail: smoother table, cushions, arches, chandelier, sharper procedural textures | M | next |
-| G4 | Board, marbles and phone: carved board, deeper grooves, round glossy marbles, proper phone model | M | |
+| G3 | Room and table detail: smoother table, cushions, arches, chandelier, sharper procedural textures | M | ✅ done |
+| G4 | Board, marbles and phone: carved board, deeper grooves, round glossy marbles, proper phone model | M | next |
 | G5 | Characters: smoother faceless heads, hair, beards, shemagh folds, hands with fingers holding cards, phone and tea | M | |
 | M15 | Settings (Master/Effects/Taunts volume, Graphics Low/Med/High), How to play pages on the phone, Esc raises the phone in game | M | |
 | M16 | Logo (full + small icon), favicon, share image | S | |
@@ -141,6 +141,7 @@ browser and take a screenshot.
 - **Graphics overhaul (decided after M14):** the user found the 240-line look too pixelated: "the vibes, not the actual super low res". Decisions: render at full screen resolution with the CRT filter on at every level (Low/Med/High change shadows, bloom, MSAA, pixel ratio cap, not pixels); real shadows + warm glow, blob shadows on Low; no vertex wobble; more polys, things should look nice; characters stay faceless but detailed; 60 fps. Then M15: volume sliders Master + Effects + Taunts, How to play as pages on the phone, Esc raises the phone in game. The user asked for G1-G5 in one go, pushing after each.
 - **Last done:** G1. New pipeline in `retro.ts` + `quality.ts`, vertex wobble removed, textures linear-filtered, phone screen and cards drawn at 4x. Dev fps meter top left (headless Edge uses a software renderer, so its fps means nothing; check on a real browser).
 - **G2:** `majlis.ts` lights = hemisphere fill 0.55, chandelier point light, a spotlight from the chandelier onto the table (the only shadow caster, Med/High), 4 corner floor lanterns with point lights (no lights on Low). `setShadows(root)` flags meshes (skips transparent/basic and `userData.noShadow`, used by the chandelier). Glowing things use `MeshBasicMaterial` brighter than white so bloom picks them up. `scene.environment` = the room rendered once with PMREM, for reflections. Low: blob shadows under marbles (`new Board(blobs)`); a contact shadow under the table always.
+- **G3:** textures are drawn at 4x (`RES` in `textures.ts`) with `mottle` blotches and `weave` threads, and double as bump maps (`lambert(map, color, bump)` in `majlis.ts`). Cushions use three's `RoundedBoxGeometry`, bolsters are capsules, niches have extruded carved frames, the table is a lathe-turned top with turned legs, the chandelier has S-curved tube arms, wax candles and flames.
 - **Next:** the next G milestone in the table.
 - **Waiting on the user's feedback:** the look of the majlis (M8), neighbours' heads cut off at the screen edges (M10), how the sounds sound (M12), taunt wording (M13), the phone hands (low-poly mittens, they read as blocks up close) (M14).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.

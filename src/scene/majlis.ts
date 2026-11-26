@@ -1,6 +1,7 @@
 // The majlis: a warm sitting room with floor cushions along the walls, a big carpet, a low round
 // table in the middle, a brass chandelier and a lantern in every corner. All geometry is made here.
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { Preset } from './quality';
 import { blobTexture, brass, carpet, frieze, plaster, sadu, wood } from './textures';
 
@@ -9,8 +10,9 @@ const HEIGHT = 3.2;
 export const TABLE_HEIGHT = 0.34;
 export const TABLE_RADIUS = 0.8;
 
-const lambert = (map: THREE.Texture, color = '#ffffff') =>
-  new THREE.MeshStandardMaterial({ map, color, roughness: 0.9 });
+/** A matte textured surface; the texture doubles as a bump map so plaster, wood and weave have relief. */
+const lambert = (map: THREE.Texture, color = '#ffffff', bump = 0) =>
+  new THREE.MeshStandardMaterial({ map, color, roughness: 0.9, bumpMap: bump ? map : null, bumpScale: bump });
 const metal = () => new THREE.MeshStandardMaterial({ map: brass(), metalness: 0.85, roughness: 0.35 });
 /** Brighter than white, so the bloom pass makes it glow. */
 const glowing = (color: string, power: number) =>
@@ -27,43 +29,72 @@ function box(w: number, h: number, d: number, material: THREE.Material, x: numbe
   return mesh;
 }
 
+/** A box with rounded edges, for anything soft (cushions). */
+function soft(
+  w: number,
+  h: number,
+  d: number,
+  r: number,
+  material: THREE.Material,
+  x: number,
+  y: number,
+  z: number,
+) {
+  const mesh = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, r), material);
+  mesh.position.set(x, y, z);
+  return mesh;
+}
+
 /** A pointed arch outline (rectangle with an ogee-ish top), used for the wall niches. */
-function archShape(width: number, height: number): THREE.Shape {
+function archShape(width: number, height: number, y0 = 0): THREE.Shape {
   const w = width / 2;
   const shape = new THREE.Shape();
-  shape.moveTo(-w, 0);
-  shape.lineTo(-w, height - w);
-  shape.quadraticCurveTo(-w, height - w * 0.2, 0, height);
-  shape.quadraticCurveTo(w, height - w * 0.2, w, height - w);
-  shape.lineTo(w, 0);
-  shape.lineTo(-w, 0);
+  shape.moveTo(-w, y0);
+  shape.lineTo(-w, y0 + height - w);
+  shape.quadraticCurveTo(-w, y0 + height - w * 0.2, 0, y0 + height);
+  shape.quadraticCurveTo(w, y0 + height - w * 0.2, w, y0 + height - w);
+  shape.lineTo(w, y0);
+  shape.lineTo(-w, y0);
   return shape;
 }
 
 function walls(group: THREE.Group) {
-  const wallMat = lambert(repeat(plaster(), 6, 3));
-  const nicheOuter = new THREE.MeshStandardMaterial({ color: '#b08a5c', roughness: 0.9 });
-  const nicheInner = new THREE.MeshStandardMaterial({ color: '#7a5634', roughness: 0.9 });
-  const friezeMat = lambert(repeat(frieze(), 14, 1));
+  const wallMat = lambert(repeat(plaster(), 6, 3), '#ffffff', 1);
+  const frameMat = lambert(repeat(plaster(), 1, 1), '#c9a273', 1);
+  const nicheMat = lambert(repeat(plaster(), 1, 1), '#6e4c2e', 1);
+  const friezeMat = lambert(repeat(frieze(), 14, 1), '#ffffff', 0.5);
+  const skirting = lambert(wood('#3a2010', 11), '#ffffff', 0.5);
   const half = ROOM / 2;
+
+  // A raised carved frame around each niche, with the recess set back behind it.
+  const frame = archShape(1.15, 1.9);
+  frame.holes.push(archShape(0.95, 1.75, 0.05));
+  const frameGeometry = new THREE.ExtrudeGeometry(frame, {
+    depth: 0.03,
+    bevelEnabled: true,
+    bevelThickness: 0.012,
+    bevelSize: 0.012,
+    bevelSegments: 2,
+    curveSegments: 24,
+  });
+  const nicheGeometry = new THREE.ShapeGeometry(archShape(0.97, 1.76, 0.04), 24);
 
   for (let side = 0; side < 4; side++) {
     const wall = new THREE.Group();
     wall.rotation.y = (side * Math.PI) / 2;
-    // Walls run past the floor and ceiling so the PS1 vertex snapping can't open cracks at the edges.
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(ROOM + 0.4, HEIGHT + 0.4), wallMat);
     plane.position.set(0, HEIGHT / 2, -half);
     wall.add(plane);
 
     const band = new THREE.Mesh(new THREE.PlaneGeometry(ROOM, 0.32), friezeMat);
     band.position.set(0, HEIGHT - 0.45, -half + 0.01);
-    wall.add(band);
+    wall.add(band, box(ROOM, 0.12, 0.03, skirting, 0, 0.06, -half + 0.015));
 
     for (const x of [-2.2, 0, 2.2]) {
-      const outer = new THREE.Mesh(new THREE.ShapeGeometry(archShape(1.15, 1.9), 6), nicheOuter);
-      outer.position.set(x, 0.75, -half + 0.015);
-      const inner = new THREE.Mesh(new THREE.ShapeGeometry(archShape(0.95, 1.75), 6), nicheInner);
-      inner.position.set(x, 0.8, -half + 0.02);
+      const outer = new THREE.Mesh(frameGeometry, frameMat);
+      outer.position.set(x, 0.75, -half + 0.005);
+      const inner = new THREE.Mesh(nicheGeometry, nicheMat);
+      inner.position.set(x, 0.75, -half + 0.004);
       wall.add(outer, inner);
     }
     group.add(wall);
@@ -71,23 +102,23 @@ function walls(group: THREE.Group) {
 
   const ceiling = new THREE.Mesh(
     new THREE.PlaneGeometry(ROOM, ROOM),
-    lambert(repeat(wood('#4a2b16', 5), 4, 4)),
+    lambert(repeat(wood('#4a2b16', 5), 4, 4), '#ffffff', 0.6),
   );
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.y = HEIGHT;
   group.add(ceiling);
-  const beam = lambert(wood('#3a2010', 6));
+  const beam = lambert(wood('#3a2010', 6), '#ffffff', 0.6);
   for (const x of [-2.4, -0.8, 0.8, 2.4]) group.add(box(0.18, 0.16, ROOM, beam, x, HEIGHT - 0.08, 0));
 }
 
 function floor(group: THREE.Group) {
   const tiles = new THREE.Mesh(
     new THREE.PlaneGeometry(ROOM, ROOM),
-    lambert(repeat(plaster(), 10, 10), '#9c7a58'),
+    lambert(repeat(plaster(), 10, 10), '#9c7a58', 1),
   );
   tiles.rotation.x = -Math.PI / 2;
   group.add(tiles);
-  const rug = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), lambert(carpet()));
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), lambert(carpet(), '#ffffff', 0.6));
   rug.rotation.x = -Math.PI / 2;
   rug.position.y = 0.005;
   // A soft contact shadow under the low table, so it sits on the carpet.
@@ -102,18 +133,18 @@ function floor(group: THREE.Group) {
 
 /** Majlis seating: a long floor cushion and back cushions along every wall, with arm bolsters. */
 function seating(group: THREE.Group) {
-  const seat = lambert(repeat(sadu(3), 6, 1));
-  const back = lambert(repeat(sadu(4), 6, 1));
-  const bolster = lambert(sadu(7));
+  const seat = lambert(repeat(sadu(3), 6, 1), '#ffffff', 0.6);
+  const back = lambert(repeat(sadu(4), 6, 1), '#ffffff', 0.6);
+  const bolster = lambert(sadu(7), '#ffffff', 0.6);
+  const bolsterGeometry = new THREE.CapsuleGeometry(0.11, 0.3, 6, 16).rotateX(Math.PI / 2);
   const half = ROOM / 2;
   for (let side = 0; side < 4; side++) {
     const run = new THREE.Group();
     run.rotation.y = (side * Math.PI) / 2;
-    run.add(box(ROOM - 1.4, 0.16, 0.75, seat, 0, 0.08, -half + 0.45));
-    run.add(box(ROOM - 1.4, 0.5, 0.2, back, 0, 0.4, -half + 0.12));
+    run.add(soft(ROOM - 1.4, 0.16, 0.75, 0.05, seat, 0, 0.08, -half + 0.45));
+    run.add(soft(ROOM - 1.4, 0.5, 0.2, 0.07, back, 0, 0.4, -half + 0.12));
     for (const x of [-2.4, -0.8, 0.8, 2.4]) {
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.5, 8), bolster);
-      arm.rotation.x = Math.PI / 2;
+      const arm = new THREE.Mesh(bolsterGeometry, bolster);
       arm.position.set(x, 0.27, -half + 0.5);
       run.add(arm);
     }
@@ -121,41 +152,53 @@ function seating(group: THREE.Group) {
   }
 }
 
-/** The low round table everyone sits around, plus the 4 floor cushions the players sit on. */
+/** The low round table everyone sits around (a turned top and legs), plus the 4 floor cushions. */
 function table(group: THREE.Group) {
-  const top = lambert(wood('#7a4522', 8));
-  const tableTop = new THREE.Mesh(new THREE.CylinderGeometry(TABLE_RADIUS, TABLE_RADIUS, 0.05, 24), top);
-  tableTop.position.y = TABLE_HEIGHT - 0.025;
-  const rim = new THREE.Mesh(
-    new THREE.CylinderGeometry(TABLE_RADIUS - 0.03, TABLE_RADIUS - 0.08, 0.09, 24),
-    top,
-  );
-  rim.position.y = TABLE_HEIGHT - 0.09;
-  group.add(tableTop, rim);
+  const top = lambert(wood('#7a4522', 8), '#ffffff', 0.5);
+  top.roughness = 0.55; // polished
+  const R = TABLE_RADIUS;
+  const edge = [
+    [0, 0],
+    [R - 0.06, 0],
+    [R - 0.015, 0.008],
+    [R, 0.025],
+    [R - 0.004, 0.042],
+    [R - 0.02, 0.05],
+    [0, 0.05],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  const tableTop = new THREE.Mesh(new THREE.LatheGeometry(edge, 72), top);
+  tableTop.position.y = TABLE_HEIGHT - 0.05;
+  const apron = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.06, R - 0.1, 0.08, 72, 1, true), top);
+  apron.position.y = TABLE_HEIGHT - 0.09;
+  group.add(tableTop, apron);
+
+  const legHeight = TABLE_HEIGHT - 0.1;
+  const turned = [
+    [0.028, 0],
+    [0.034, 0.02],
+    [0.022, 0.06],
+    [0.03, 0.12],
+    [0.022, 0.18],
+    [0.036, 0.2],
+    [0.036, legHeight],
+  ].map(([r, y]) => new THREE.Vector2(r, y));
+  const legGeometry = new THREE.LatheGeometry(turned, 16);
   for (let i = 0; i < 4; i++) {
     const a = (i * Math.PI) / 2 + Math.PI / 4;
-    group.add(
-      box(
-        0.07,
-        TABLE_HEIGHT - 0.1,
-        0.07,
-        top,
-        Math.cos(a) * 0.55,
-        (TABLE_HEIGHT - 0.1) / 2,
-        Math.sin(a) * 0.55,
-      ),
-    );
+    const leg = new THREE.Mesh(legGeometry, top);
+    leg.position.set(Math.cos(a) * 0.55, 0, Math.sin(a) * 0.55);
+    group.add(leg);
   }
-  const cushion = lambert(sadu(9));
+  const cushion = lambert(sadu(9), '#ffffff', 0.6);
   for (let i = 0; i < 4; i++) {
     const a = (i * Math.PI) / 2;
-    const c = box(0.75, 0.12, 0.75, cushion, Math.sin(a) * 1.25, 0.06, Math.cos(a) * 1.25);
+    const c = soft(0.75, 0.12, 0.75, 0.05, cushion, Math.sin(a) * 1.25, 0.06, Math.cos(a) * 1.25);
     c.rotation.y = a;
     group.add(c);
   }
 }
 
-/** Brass chandelier with candle bulbs. Returns the bulbs so they can flicker. */
+/** Brass chandelier with curved arms and candle flames. Returns the flames so they can flicker. */
 function chandelier(parent: THREE.Group): THREE.Mesh[] {
   const group = new THREE.Group();
   group.userData.noShadow = true; // it hangs around the light, so it must not block it
@@ -164,21 +207,29 @@ function chandelier(parent: THREE.Group): THREE.Mesh[] {
   const glow = glowing('#ffd38a', 4);
   const top = HEIGHT;
   const hang = 2.25;
-  group.add(box(0.025, top - hang - 0.1, 0.025, brassy, 0, (top + hang + 0.1) / 2, 0));
+  const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, top - hang - 0.1, 8), brassy);
+  chain.position.y = (top + hang + 0.1) / 2;
+  group.add(chain);
 
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), brassy);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 16), brassy);
   body.position.y = hang;
-  const finial = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.25, 8), brassy);
+  const finial = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.25, 16), brassy);
   finial.rotation.x = Math.PI;
   finial.position.y = hang - 0.25;
-  group.add(body, finial);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), brassy);
+  knob.position.y = hang - 0.38;
+  group.add(body, finial, knob);
 
-  const bulbs: THREE.Mesh[] = [];
+  const candleGeometry = new THREE.CylinderGeometry(0.02, 0.022, 0.1, 12);
+  const panGeometry = new THREE.CylinderGeometry(0.045, 0.03, 0.015, 16);
+  const flameGeometry = new THREE.SphereGeometry(0.022, 10, 8).scale(1, 1.8, 1);
+  const wax = new THREE.MeshStandardMaterial({ color: '#f2e6cf', roughness: 0.6 });
+  const flames: THREE.Mesh[] = [];
   for (const [radius, y, count] of [
     [0.55, hang - 0.05, 8],
     [0.32, hang + 0.22, 6],
   ] as const) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.02, 4, 16), brassy);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.014, 8, 64), brassy);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = y;
     group.add(ring);
@@ -186,17 +237,25 @@ function chandelier(parent: THREE.Group): THREE.Mesh[] {
       const a = (i / count) * Math.PI * 2;
       const x = Math.cos(a) * radius;
       const z = Math.sin(a) * radius;
-      const arm = box(0.02, 0.02, radius, brassy, x / 2, y, z / 2);
-      arm.rotation.y = -a + Math.PI / 2;
-      const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.12, 6), brassy);
+      // An S-shaped arm from the body out and up to the candle.
+      const curve = new THREE.CubicBezierCurve3(
+        new THREE.Vector3(0, hang - 0.04, 0),
+        new THREE.Vector3(x * 0.4, hang - 0.2, z * 0.4),
+        new THREE.Vector3(x * 0.9, y - 0.12, z * 0.9),
+        new THREE.Vector3(x, y, z),
+      );
+      const arm = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.009, 6), brassy);
+      const pan = new THREE.Mesh(panGeometry, brassy);
+      pan.position.set(x, y + 0.005, z);
+      const candle = new THREE.Mesh(candleGeometry, wax);
       candle.position.set(x, y + 0.06, z);
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 4), glow);
-      bulb.position.set(x, y + 0.15, z);
-      group.add(arm, candle, bulb);
-      bulbs.push(bulb);
+      const flame = new THREE.Mesh(flameGeometry, glow);
+      flame.position.set(x, y + 0.14, z);
+      group.add(arm, pan, candle, flame);
+      flames.push(flame);
     }
   }
-  return bulbs;
+  return flames;
 }
 
 export interface Majlis {

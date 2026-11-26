@@ -6,24 +6,51 @@ function seeded(seed: number): () => number {
   return () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 }
 
+// Patterns are drawn in small logical units on a canvas RES times larger, so they stay sharp up close.
+const RES = 4;
+
 function make(size: number, draw: (g: CanvasRenderingContext2D, rnd: () => number) => void, seed = 1) {
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
+  canvas.width = canvas.height = size * RES;
   const g = canvas.getContext('2d')!;
+  g.scale(RES, RES);
   draw(g, seeded(seed));
   const tex = new THREE.CanvasTexture(canvas);
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
-/** Sprinkle darker and lighter pixels for a hand-made, worn feel. */
+/** Sprinkle fine darker and lighter specks for a hand-made, worn feel. */
 function grain(g: CanvasRenderingContext2D, rnd: () => number, size: number, amount: number, alpha = 0.12) {
-  for (let i = 0; i < amount; i++) {
+  for (let i = 0; i < amount * RES * RES; i++) {
     g.fillStyle = rnd() < 0.5 ? `rgba(0,0,0,${alpha})` : `rgba(255,240,200,${alpha})`;
-    g.fillRect(Math.floor(rnd() * size), Math.floor(rnd() * size), 1, 1);
+    g.fillRect(rnd() * size, rnd() * size, (1 + rnd()) / RES, (1 + rnd()) / RES);
   }
+}
+
+/** Large soft blotches, so a flat colour looks like real plaster or worn wool. */
+function mottle(g: CanvasRenderingContext2D, rnd: () => number, size: number, count: number, alpha: number) {
+  for (let i = 0; i < count; i++) {
+    const x = rnd() * size;
+    const y = rnd() * size;
+    const r = size * (0.05 + rnd() * 0.15);
+    const spot = g.createRadialGradient(x, y, 0, x, y, r);
+    const tone = rnd() < 0.5 ? '0,0,0' : '255,240,210';
+    spot.addColorStop(0, `rgba(${tone},${alpha})`);
+    spot.addColorStop(1, `rgba(${tone},0)`);
+    g.fillStyle = spot;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+}
+
+/** Fine threads across a woven surface. */
+function weave(g: CanvasRenderingContext2D, size: number) {
+  g.fillStyle = 'rgba(0,0,0,0.07)';
+  for (let y = 0; y < size; y += 0.75) g.fillRect(0, y, size, 0.25);
+  g.fillStyle = 'rgba(255,240,210,0.04)';
+  for (let x = 0; x < size; x += 0.75) g.fillRect(x, 0, 0.25, size);
 }
 
 /** Warm lime plaster for the walls. */
@@ -31,6 +58,7 @@ export const plaster = () =>
   make(64, (g, rnd) => {
     g.fillStyle = '#d9b98c';
     g.fillRect(0, 0, 64, 64);
+    mottle(g, rnd, 64, 40, 0.06);
     grain(g, rnd, 64, 900, 0.08);
   });
 
@@ -41,11 +69,18 @@ export const wood = (base = '#6b3f1f', seed = 2) =>
     (g, rnd) => {
       g.fillStyle = base;
       g.fillRect(0, 0, 64, 64);
-      for (let y = 0; y < 64; y += 2 + Math.floor(rnd() * 3)) {
-        g.fillStyle = `rgba(0,0,0,${0.08 + rnd() * 0.12})`;
-        g.fillRect(0, y, 64, 1);
+      // Wavy grain lines of varying weight.
+      for (let y = 0; y < 64; y += 0.8 + rnd() * 2) {
+        g.strokeStyle = `rgba(0,0,0,${0.05 + rnd() * 0.12})`;
+        g.lineWidth = 0.2 + rnd() * 0.6;
+        const wave = rnd() * 1.2;
+        const phase = rnd() * 6;
+        g.beginPath();
+        for (let x = 0; x <= 64; x += 2) g.lineTo(x, y + Math.sin(x / 9 + phase) * wave);
+        g.stroke();
       }
-      grain(g, rnd, 64, 300);
+      mottle(g, rnd, 64, 12, 0.05);
+      grain(g, rnd, 64, 200);
     },
     seed,
   );
@@ -91,7 +126,9 @@ export const carpet = () =>
     diamond(24, '#8e1f1f');
     diamond(14, '#e8d3a0');
     diamond(8, '#1f2c5c');
-    grain(g, rnd, 128, 2500, 0.1);
+    weave(g, 128);
+    mottle(g, rnd, 128, 30, 0.05);
+    grain(g, rnd, 128, 1500, 0.08);
   });
 
 /** Al Sadu weave: bold stripes and rows of triangles in red, black and cream, for cushions. */
@@ -108,7 +145,8 @@ export const sadu = (seed = 3) =>
       for (let x = 0; x < 64; x += 8) for (let s = 0; s < 4; s++) g.fillRect(x + s, 12 + s, 8 - s * 2, 1); // triangle row
       g.fillStyle = '#1b1410';
       for (let x = 4; x < 64; x += 8) for (let s = 0; s < 4; s++) g.fillRect(x + s, 44 + s, 8 - s * 2, 1);
-      grain(g, rnd, 64, 400);
+      weave(g, 64);
+      grain(g, rnd, 64, 250);
     },
     seed,
   );
