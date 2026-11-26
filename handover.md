@@ -43,7 +43,10 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/domain/bot.ts` | `botPlay(game, player, random)`: tries every legal play, keeps the one that leaves its team furthest ahead (kills, home, sabotage fall out of the score), saves A/K/5/7 on ties |
 | `src/domain/game.ts` | Whole game: `newGame`, `legalPlays(game, player)`, `applyPlay(game, player, play, random)` (null = illegal), `viewFor` (what one player may see). Plays: exit, move, king, split, swap, burnNext (red 10), pickNext (red Q), burn, pickBurn |
 | `debug.html`, `src/debug/main.ts` | Dev-only rules debug board at http://localhost:5173/debug.html: 2D canvas board, your legal plays as buttons, 3 bots, play log. Not in the production build (Vite only builds `index.html`) |
-| `src/main.ts` | Client entry: three.js scene (placeholder board until M8) |
+| `src/main.ts` | Client entry: renderer, majlis scene, seat camera (`?cam=overview` for a corner view of the room), lobby UI |
+| `src/scene/majlis.ts` | The room: walls with arch niches and star frieze, wood ceiling and beams, carpet, Sadu floor seating along the walls, low round table (`TABLE_HEIGHT` 0.34, `TABLE_RADIUS` 0.8) with 4 player cushions, brass chandelier. 2 lights only (hemisphere + chandelier point light) |
+| `src/scene/textures.ts` | Procedural canvas textures (plaster, wood, carpet, Sadu weave, frieze, brass), small and nearest-filtered |
+| `src/scene/retro.ts` | PS1/CRT look: renders at 240 px tall, upscales with 15-bit colour, dithering, vignette, scanlines; `snapVertices` adds the PS1 vertex wobble to every material |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (claims a free code in its Durable Object), `GET /api/rooms/:code` (exists/full/started), `/api/rooms/:code/ws` (WebSocket). `Room` Durable Object: hibernating WebSockets, lobby saved in storage under `lobby`, empty rooms deleted by an alarm after 1 hour |
 | `src/domain/lobby.ts` | Lobby rules: join (name 1-14 letters), sit (pick seat/team), leave (host passes on), start (host only), `lobbyView` (no private ids) |
 | `src/lobby/ui.ts` | Temporary plain HTML lobby + 2D online table (legal plays as buttons, turn countdown, rematch, auto-reconnect). Replaced by the 3D table (M9-M11) and phone menu (M14) |
@@ -88,8 +91,8 @@ browser and take a screenshot.
 | M5 | Flat 2D debug board, play a full game to check rules | S | ✅ done |
 | M6 | Online rooms: create/join by code or link, name, pick seat/team, host starts, bots fill seats | M | ✅ done |
 | M7 | Online play: hidden hands, network moves, reconnect, 15 s turn timer then bot plays, rematch | M | ✅ done |
-| M8 | 3D majlis: room, low table, warm light, chandelier, PS1/CRT look | M | next |
-| M9 | 3D board: wooden board, grooves, marbles, movement | M | |
+| M8 | 3D majlis: room, low table, warm light, chandelier, PS1/CRT look | M | ✅ done |
+| M9 | 3D board: wooden board, grooves, marbles, movement | M | next |
 | M10 | Players: floating heads, hands with cards, snack trays | M | |
 | M11 | Cameras (first person / top-down, `V`) + picking cards and marbles + legal move highlights | M | |
 | M12 | Procedural sound, mute toggle | M | |
@@ -109,12 +112,13 @@ browser and take a screenshot.
 | M4 | S | 15% | 16% |
 | M5 | S | 16% | 17% |
 | M6 | M | 17% | 19% |
-| M7 | M | 19% | ? |
+| M7 | M | 19% | 22% |
+| M8 | M | 22% | ? |
 
 ## Current state
 
-- **Last done:** M7. Online games work: the server deals, keeps every hand private, accepts only legal plays, runs bots, plays for a human after 15 s, keeps your seat when you drop and reconnects you automatically, and the host can start a rematch (next dealer). Tested live with 2 WebSocket clients + 2 bots: private hands, illegal move refused, timeout after 15.2 s, reconnect into seat 0. Rematch was not tested live (needs a finished game).
-- **Next:** M8 3D majlis in `src/scene/`: replace the placeholder in `src/main.ts` with the room (floor cushions, low table, walls with arches/patterns, warm lighting, chandelier), all procedural (canvas textures, low-poly geometry). PS1/CRT look: render to a small render target (about 320x240) with nearest filtering, then upscale; optional vertex snapping and a light scanline/vignette pass. Keep the 2D online table working on top until M9-M11. Check with a headless Edge screenshot. Consider `/impeccable` only for 2D UI, not the 3D scene.
+- **Last done:** M8. The majlis in 3D with the PS1/CRT look, all made in code. Checked with headless Edge screenshots from the seat and `?cam=overview`. The user hasn't reviewed the look yet: ask for feedback before polishing.
+- **Next:** M9 3D board in `src/scene/board.ts`: a round wooden board on the table (fits inside `TABLE_RADIUS`), 72 drilled grooves around the edge (see `docs/reference/board-groove.png`), start tiles marked in each player's colour, 4 home holes running inward from each tile-17 entrance, 4 base holes per player near their start. Marbles as small glossy spheres in 4 colours, placed from `game.marbles` and animated hole to hole along their path. Use the same angles as `src/debug/board2d.ts`. Feed it from the online `game` messages (export a hook from `src/lobby/ui.ts`).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.

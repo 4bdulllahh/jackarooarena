@@ -1,24 +1,29 @@
 import * as THREE from 'three';
 import { startLobbyUi } from './lobby/ui';
+import { buildMajlis } from './scene/majlis';
+import { Retro, snapVertices } from './scene/retro';
 
-// shortcut: placeholder scene to prove three.js and the Worker run, replaced in M8 (majlis).
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
+// antialias off: the low-res pixel look is the point, and it's cheaper on weak PCs.
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-const scene = new THREE.Scene();
-scene.background = new THREE.Color('#2a170c');
-const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-camera.position.set(0, 4, 6);
-camera.lookAt(0, 0, 0);
+const retro = new Retro(renderer);
 
-scene.add(new THREE.HemisphereLight('#ffd9a0', '#3a2010', 1.5));
-const board = new THREE.Mesh(
-  new THREE.CylinderGeometry(2.5, 2.5, 0.2, 24),
-  new THREE.MeshLambertMaterial({ color: '#8a5a2b', flatShading: true }),
-);
-scene.add(board);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#1a0f08');
+scene.fog = new THREE.Fog('#2a170c', 6, 14);
+const majlis = buildMajlis();
+scene.add(majlis.group);
+snapVertices(scene);
+
+// shortcut: fixed view from seat 0 with a gentle idle sway; M11 adds the seat and top-down cameras.
+const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 30);
+// `?cam=overview` shows the whole room from a corner, for checking the scene during development.
+const overview = new URLSearchParams(location.search).get('cam') === 'overview';
+const eye = overview ? new THREE.Vector3(2.6, 2.3, 2.6) : new THREE.Vector3(0, 0.95, 1.35);
+const target = overview ? new THREE.Vector3(-0.6, 0.9, -0.6) : new THREE.Vector3(0, 0.45, -0.6);
 
 function resize() {
-  renderer.setSize(innerWidth, innerHeight, false);
+  retro.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
 }
@@ -26,8 +31,10 @@ addEventListener('resize', resize);
 resize();
 
 renderer.setAnimationLoop((t) => {
-  board.rotation.y = t / 4000;
-  renderer.render(scene, camera);
+  camera.position.set(eye.x + Math.sin(t / 2700) * 0.015, eye.y + Math.sin(t / 1900) * 0.008, eye.z);
+  camera.lookAt(target);
+  majlis.update(t);
+  retro.render(scene, camera);
 });
 
 const status = document.querySelector('#status')!;
