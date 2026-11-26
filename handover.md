@@ -125,12 +125,13 @@ browser and take a screenshot.
 | M10 | M | 27% | 29% |
 | M11 | M | 29% | 36% (many screenshots: keep image checks few) |
 | M12 | M | 36% | 38% |
-| M13 | S | 38% | ? |
+| M13 | S | 38% | ? (ask at the start of the next session) |
 
 ## Current state
 
 - **Last done:** M13. Taunts: `T` or the top-right button opens 6 presets (Hahaha, Yalla!, Facepalm, Khalas!, Clap clap, Too easy), each with a sound and a speech bubble over the speaker's head (yours above your cards). Server validates and rate-limits; bots gloat after kills. Also fixed: elements with `display: flex` now really hide (`[hidden]` rule in style.css). Verified with WebSocket script + Edge (menu, bubble, no errors).
 - **Next:** M14 phone menu. On load (no room yet), first-person seat view with your left hand holding a low-poly phone close to the camera and your right hand lifting the istikana now and then. The phone screen is a canvas texture showing the menu: title, Play (create/join), Chaos (Coming soon, greyed), Settings. Input: click the screen (raycast + UV to canvas coords) or keyboard; the name and room code still need real `<input>`s, so overlay a small HTML form exactly over the phone screen when typing. Replace `src/lobby/ui.ts`'s visible form with the phone; keep its networking. When the game starts, the phone lowers out of view and your cards come up.
+- **Waiting on the user's feedback:** the look of the majlis (M8), neighbours' heads cut off at the screen edges (M10), how the sounds sound (M12), taunt wording (M13).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
-- **Not pushed:** the M2 commit.
+- **Not pushed:** nothing. Everything up to M13 is on GitHub.
