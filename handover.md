@@ -37,6 +37,8 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | Folder | What's in it |
 | --- | --- |
 | `src/domain/` | Pure game logic shared by client and server, fully tested (`*.test.ts` next to the code) |
+| `src/domain/board.ts` | Board constants: track 0..71, start = p*18, home entrance = start - 2 (tile 17), positions (`BASE` = -1, `HOME` + 0..3) |
+| `src/domain/move.ts` | `moveMarble` (normal and backward moves), `kingMove`, `exitMarble`, `fiveEntersHome`. Each returns new positions or `null` when illegal |
 | `src/main.ts` | Client entry: three.js scene (placeholder board until M8) |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (new code), `/api/rooms/:code` (asks the `Room` Durable Object) |
 | `wrangler.jsonc` | Worker config: static assets, SPA fallback for room links, `ROOMS` Durable Object binding |
@@ -64,8 +66,8 @@ browser and take a screenshot.
 | # | Milestone | Size | Status |
 | --- | --- | --- | --- |
 | M1 | Setup: Vite + three.js + TS, Worker + Durable Object skeleton, CI, docs | S | ✅ done |
-| M2 | Rules engine 1: 72-tile board, base, home lane, movement, jump limit, kills, invincible start, home entrance block | M | next |
-| M3 | Rules engine 2: all cards (7 split, 5, red 10/J/Q, K), burn/pass, deal 4-4-5, turn order, teams, win | M | |
+| M2 | Rules engine 1: 72-tile board, base, home lane, movement, jump limit, kills, invincible start, home entrance block | M | ✅ done |
+| M3 | Rules engine 2: all cards (7 split, 5, red 10/J/Q, K), burn/pass, deal 4-4-5, turn order, teams, win | M | next |
 | M4 | Bots: legal moves, prefer kills and sabotage | S | |
 | M5 | Flat 2D debug board, play a full game to check rules | S | |
 | M6 | Online rooms: create/join by code or link, name, pick seat/team, host starts, bots fill seats | M | |
@@ -85,12 +87,16 @@ browser and take a screenshot.
 
 | Milestone | Size | Usage before | Usage after |
 | --- | --- | --- | --- |
-| Kickoff + M1 | S | 9% (at M1 start) | ? |
+| M1 | S | 9% | 10% |
+| M2 | M | 10% | ? |
 
 ## Current state
 
-- **Last done:** M1. Skeleton runs: three.js placeholder board, Worker answers `/api/health`, creates room codes and reaches the `Room` Durable Object, room links fall back to `index.html`. CI workflow added.
-- **Next:** M2. First step: model the board in `src/domain/board.ts` (72 track tiles, 18 per player, start = tile 1 of each section, home entrance = tile 17, 4-hole base and home per player), then movement rules with tests built from the user's examples in braindump items 36-49.
-- **Open questions:** confirm the tile-17 home entrance against `docs/reference/board-layout.png` while modelling the board.
+- **Last done:** M2. Board model and movement rules in `src/domain/board.ts` and `move.ts`, 31 tests from the user's own examples (jump limit, invincible start, K path kill, leaving base, 4-back shortcut, forced home entry, entrance block, 5 by partner vs opponent).
+- **Next:** M3. Cards and turns in `src/domain/`: map each card to the moves in `move.ts` (A, 2-9, 4 back, 5 on any marble, 7 split, black/red 10/J/Q, K), list legal plays per hand, burn and pass, a full game state (deck, deal 4-4-5, turn order, who starts each deck, teams, finished players moving their partner's marbles, win).
+- **Open questions (defaults in code, ask the user before M3 ends):**
+  - K reaching its home entrance while another marble sits on it: the code kills the blocker and enters home.
+  - A 5 on an opponent's marble never enters their home; on your own or partner's it must. Players can't choose.
+  - Jump limits for a 5 on someone else's marble use that marble's colour (it can't jump its own colour).
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
-- **Not pushed:** the M1 commit.
+- **Not pushed:** the M2 commit.
