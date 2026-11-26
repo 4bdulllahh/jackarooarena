@@ -3,6 +3,7 @@ import { cardName } from '../domain/cards';
 import type { Play } from '../domain/game';
 import { MAX_NAME } from '../domain/lobby';
 import { isRoomCode } from '../domain/roomCode';
+import { type TauntId, isTaunt } from '../domain/taunts';
 
 interface LobbyView {
   seats: ({ name: string; you: boolean } | null)[];
@@ -31,9 +32,14 @@ export interface TableHooks {
   onSeat(seat: number): void;
   /** Every game update from the server. */
   onGame(view: GameView): void;
+  /** Someone threw a taunt. */
+  onTaunt(seat: number, id: TauntId): void;
 }
 
-export function startLobbyUi(root: HTMLElement, hooks: TableHooks): { play(play: Play): void } {
+export function startLobbyUi(
+  root: HTMLElement,
+  hooks: TableHooks,
+): { play(play: Play): void; taunt(id: TauntId): void } {
   const codeFromUrl = location.pathname.slice(1).toUpperCase();
   root.innerHTML = `
     <form id="entry">
@@ -91,6 +97,9 @@ export function startLobbyUi(root: HTMLElement, hooks: TableHooks): { play(play:
       else if (msg.t === 'lobby') {
         renderSeats((lobby = msg));
         if (msg.you >= 0) hooks.onSeat(msg.you);
+      } else if (msg.t === 'taunt') {
+        const t = msg as unknown as { seat: number; id: unknown };
+        if (isTaunt(t.id)) hooks.onTaunt(t.seat, t.id);
       } else if (msg.t === 'game') {
         renderGame((game = msg));
         hooks.onGame(msg);
@@ -168,5 +177,5 @@ export function startLobbyUi(root: HTMLElement, hooks: TableHooks): { play(play:
   if (isRoomCode(codeFromUrl) && nameInput.value && localStorage.getItem(`id:${codeFromUrl}`))
     void roomExists(codeFromUrl).then((ok) => ok && connect(codeFromUrl));
   $('copy').onclick = () => navigator.clipboard.writeText(location.href).then(() => say('Link copied.'));
-  return { play: (play) => send({ t: 'play', play }) };
+  return { play: (play) => send({ t: 'play', play }), taunt: (id) => send({ t: 'taunt', id }) };
 }

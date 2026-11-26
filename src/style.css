@@ -1,3 +1,8 @@
+/* Elements styled with display: flex still have to disappear when hidden. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -79,4 +84,57 @@ body {
   border-radius: 0.3rem;
   font: inherit;
   cursor: pointer;
+}
+
+#taunt {
+  position: fixed;
+  top: 3.6rem;
+  right: 1rem;
+}
+
+#taunts {
+  position: fixed;
+  top: 6.2rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+#mute,
+#taunt,
+#taunts button {
+  padding: 0.35rem 0.7rem;
+  background: #1a0f08dd;
+  color: #f3e2c4;
+  border: 1px solid #d9a441;
+  border-radius: 0.3rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.bubble {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  padding: 0.4rem 0.8rem;
+  background: #f4ead6;
+  color: #1b1410;
+  border: 2px solid #1b1410;
+  border-radius: 1rem;
+  font-weight: bold;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: pop 0.2s ease-out;
+}
+
+@keyframes pop {
+  from {
+    transform: translate(-50%, -100%) scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    animation: none;
+  }
 }

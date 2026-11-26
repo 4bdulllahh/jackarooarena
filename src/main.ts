@@ -9,6 +9,7 @@ import { buildMajlis } from './scene/majlis';
 import { Players } from './scene/players';
 import { Retro, snapVertices } from './scene/retro';
 import { isMuted, setMuted, sounds } from './scene/sound';
+import { TAUNTS, type TauntId, killed, tauntLabel } from './domain/taunts';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
 // antialias off: the low-res pixel look is the point, and it's cheaper on weak PCs.
@@ -105,6 +106,7 @@ renderer.setAnimationLoop((t) => {
   majlis.update(t);
   board.update(t);
   players.update(t, turn);
+  placeBubbles(t);
   retro.render(scene, camera);
 });
 
@@ -115,6 +117,59 @@ fetch('/api/health')
   .then((text) => (status.textContent = text));
 
 let seat: Player = 0;
+
+// Taunts: speech bubbles over the speaker's head for 2.5 s (yours shows above your cards).
+const bubbles: { el: HTMLElement; seat: number; until: number }[] = [];
+const headPos = new THREE.Vector3();
+function showTaunt(from: number, id: TauntId) {
+  const el = document.createElement('div');
+  el.className = 'bubble';
+  el.textContent = tauntLabel(id);
+  document.body.append(el);
+  bubbles.push({ el, seat: from, until: performance.now() + 2500 });
+  sounds.taunt(id);
+}
+function placeBubbles(now: number) {
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i]!;
+    if (now > b.until) {
+      b.el.remove();
+      bubbles.splice(i, 1);
+      continue;
+    }
+    let x = 0.5;
+    let y = 0.62;
+    if (b.seat !== seat) {
+      players.headOf(b.seat).getWorldPosition(headPos);
+      headPos.y += 0.2;
+      headPos.project(camera);
+      x = (headPos.x + 1) / 2;
+      y = (1 - headPos.y) / 2;
+    }
+    b.el.style.left = `${Math.min(92, Math.max(8, x * 100))}%`;
+    b.el.style.top = `${Math.min(90, Math.max(6, y * 100))}%`;
+  }
+}
+
+let sendTaunt: (id: TauntId) => void = () => {};
+const tauntMenu = document.querySelector<HTMLElement>('#taunts')!;
+tauntMenu.replaceChildren(
+  ...TAUNTS.map((t) => {
+    const button = document.createElement('button');
+    button.textContent = t.label;
+    button.onclick = () => {
+      sendTaunt(t.id);
+      tauntMenu.hidden = true;
+    };
+    return button;
+  }),
+);
+document.querySelector<HTMLButtonElement>('#taunt')!.onclick = () => (tauntMenu.hidden = !tauntMenu.hidden);
+addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return;
+  if (e.key.toLowerCase() === 't') tauntMenu.hidden = !tauntMenu.hidden;
+  if (e.key === 'Escape') tauntMenu.hidden = true;
+});
 let sendPlay: (play: Play) => void = () => {};
 const controls = new Controls(camera, canvas, board, players, document.querySelector('#choices')!, (play) =>
   sendPlay(play),
@@ -133,8 +188,10 @@ const ui = startLobbyUi(document.querySelector('#lobby')!, {
     turn = view.winner === null ? view.turn : null;
     cardSounds(view.handSizes, view.plays.length > 0);
   },
+  onTaunt: showTaunt,
 });
 sendPlay = ui.play;
+sendTaunt = ui.taunt;
 
 if (params.has('demo')) {
   const auto = params.get('demo') === 'auto';
@@ -154,12 +211,16 @@ if (params.has('demo')) {
     game = applyPlay(game, 0, play, Math.random) ?? game;
     show();
   };
+  sendTaunt = (id) => showTaunt(0, id);
   show();
   setInterval(() => {
     if (game.winner !== null) game = newGame(Math.random);
     const actor = (game.pending?.kind === 'pick' ? game.pending.by : game.turn) as Player;
     if (actor === 0 && !auto) return; // your move: waiting for a click
+    const before = game.marbles;
     game = applyPlay(game, actor, botPlay(game, actor, Math.random), Math.random)!;
     show();
+    if (killed(before, game.marbles) && Math.random() < 0.5)
+      showTaunt(actor, Math.random() < 0.5 ? 'laugh' : 'fire');
   }, 700);
 }

@@ -101,6 +101,22 @@ export const sounds = {
     tone(880, 0.6, 0.12, 'sine', 1);
     tone(1320, 0.5, 0.08, 'sine', 1, 0.12);
   },
+  /** One sound per taunt. */
+  taunt(id: string) {
+    if (id === 'laugh')
+      for (let i = 0; i < 4; i++) tone(vary(520 - i * 40), 0.09, 0.18, 'triangle', 0.8, i * 0.11);
+    else if (id === 'yalla') {
+      tone(392, 0.12, 0.2, 'square', 1);
+      tone(587, 0.2, 0.2, 'square', 1.05, 0.13);
+    } else if (id === 'facepalm') {
+      tone(140, 0.2, 0.4, 'sine', 0.5);
+      hiss(900, 1, 0.08, 0.25);
+    } else if (id === 'khalas') {
+      tone(660, 0.12, 0.18, 'square', 1);
+      tone(440, 0.3, 0.18, 'square', 0.9, 0.14);
+    } else if (id === 'clap') for (let i = 0; i < 3; i++) hiss(vary(1500), 1.5, 0.05, 0.4, 1200, i * 0.16);
+    else if (id === 'fire') hiss(400, 1, 0.5, 0.25, 3000);
+  },
   /** The camera moving between views. */
   whoosh() {
     hiss(300, 0.8, 0.35, 0.12, 1400);

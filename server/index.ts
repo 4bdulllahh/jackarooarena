@@ -4,6 +4,7 @@ import { botPlay } from '../src/domain/bot';
 import { type Game, type Play, applyPlay, legalPlays, newGame, viewFor } from '../src/domain/game';
 import { type Lobby, join, leave, lobbyView, newLobby, sit, start } from '../src/domain/lobby';
 import { isRoomCode, newRoomCode } from '../src/domain/roomCode';
+import { type TauntId, isTaunt, killed } from '../src/domain/taunts';
 
 interface Env {
   ROOMS: DurableObjectNamespace<Room>;
@@ -24,6 +25,7 @@ const IDLE_MS = 60 * 60 * 1000; // an empty room is deleted after an hour
 const TURN_MS = 15_000; // then a bot plays the turn for the human
 const BOT_MS = 900; // bots wait a moment so people can follow
 const MAX_MESSAGE = 2000;
+const TAUNT_GAP_MS = 2000; // one taunt per player every 2 seconds
 const ID_PATTERN = /^[0-9a-f-]{36}$/;
 
 const random = () => crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32;
@@ -36,6 +38,7 @@ const actorOf = (game: Game): Player => (game.pending?.kind === 'pick' ? game.pe
 export class Room extends DurableObject<Env> {
   private lobby: Lobby | null = null;
   private match: Match | null = null;
+  private lastTaunt = new Map<string, number>(); // in memory only: losing it on hibernation is harmless
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -101,6 +104,13 @@ export class Room extends DurableObject<Env> {
       if (known !== this.lobby.host) return fail('Only the host can start a rematch.');
       if (!this.match || this.match.game.winner === null) return fail('The game is still going.');
       this.newMatch();
+    } else if (msg.t === 'taunt') {
+      const seat = this.lobby.seats.findIndex((s) => s?.id === known);
+      const now = Date.now();
+      if (seat < 0 || !isTaunt(msg.id) || now - (this.lastTaunt.get(known) ?? 0) < TAUNT_GAP_MS) return;
+      this.lastTaunt.set(known, now);
+      this.tauntAll(seat, msg.id);
+      return;
     } else if (msg.t === 'play') {
       const seat = this.lobby.seats.findIndex((s) => s?.id === known);
       if (!this.match || seat < 0) return fail('You are not playing in this game.');
@@ -142,9 +152,12 @@ export class Room extends DurableObject<Env> {
     if (!match || match.game.winner !== null) return;
     const actor = actorOf(match.game);
     if (match.bots[actor] || Date.now() >= match.deadline - 50) {
+      const before = match.game.marbles;
       this.advance(applyPlay(match.game, actor, botPlay(match.game, actor, random), random)!);
       await this.save();
       this.broadcast();
+      if (match.bots[actor] && killed(before, match.game.marbles) && random() < 0.5)
+        this.tauntAll(actor, random() < 0.5 ? 'laugh' : 'fire');
     }
     await this.schedule();
   }
@@ -169,6 +182,11 @@ export class Room extends DurableObject<Env> {
     if (!match || match.game.winner !== null) return;
     const bot = match.bots[actorOf(match.game)];
     await this.ctx.storage.setAlarm(bot ? Date.now() + BOT_MS : match.deadline);
+  }
+
+  private tauntAll(seat: number, id: TauntId): void {
+    const msg = JSON.stringify({ t: 'taunt', seat, id });
+    for (const ws of this.ctx.getWebSockets()) ws.send(msg);
   }
 
   private async save(): Promise<void> {

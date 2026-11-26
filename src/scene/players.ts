@@ -300,6 +300,11 @@ export class Players {
     this.select(this.selected);
   }
 
+  /** A player's head (for placing speech bubbles). */
+  headOf(seat: number): THREE.Object3D {
+    return this.seats[seat]!.head;
+  }
+
   /** Your card meshes, for clicking. Each has `userData.card`. */
   ownCards(): THREE.Object3D[] {
     return this.seats[this.me]!.cards.children[0]?.children ?? [];
