@@ -1,6 +1,7 @@
-// The players around the table: floating low-poly heads (hair and beard, no face) and floating
-// hands holding cards, plus a snack tray beside every cushion. Seat s sits at angle s * 90°.
+// The players around the table: floating heads (hair and beard, no face) and floating hands
+// holding cards, plus a snack tray beside every cushion. Seat s sits at angle s * 90°.
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { type Card, cardName, isRed } from '../domain/cards';
 
 const SEAT_RADIUS = 1.25;
@@ -25,69 +26,154 @@ export const LOOKS: Look[] = [
 
 function shemaghTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 32;
+  canvas.width = canvas.height = 128;
   const g = canvas.getContext('2d')!;
   g.fillStyle = '#efe6d8';
-  g.fillRect(0, 0, 32, 32);
+  g.fillRect(0, 0, 128, 128);
   g.fillStyle = '#b3242a';
-  for (let i = 0; i < 32; i += 4) {
-    g.fillRect(i, 0, 1, 32);
-    g.fillRect(0, i, 32, 1);
+  for (let i = 0; i < 128; i += 16) {
+    g.fillRect(i, 0, 4, 128);
+    g.fillRect(0, i, 128, 4);
+    g.fillRect(i + 7, i + 7, 3, 3); // a small diamond dot in every square
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(3, 2);
   return tex;
 }
 
-/** A faceless head: skin, hair or shemagh on top, and a beard on the lower front. Faces -z. */
+let strands: THREE.CanvasTexture | null = null;
+
+/** Short strokes in grey, used as a bump map so hair and beards look like hair, not plastic. */
+function strandTexture(): THREE.CanvasTexture {
+  if (strands) return strands;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const g = canvas.getContext('2d')!;
+  g.fillStyle = '#808080';
+  g.fillRect(0, 0, 128, 128);
+  let seed = 5;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  g.lineWidth = 1;
+  for (let i = 0; i < 1800; i++) {
+    const x = rnd() * 128;
+    const y = rnd() * 128;
+    g.strokeStyle = rnd() < 0.5 ? '#404040' : '#c0c0c0';
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (rnd() - 0.5) * 3, y + 4 + rnd() * 6);
+    g.stroke();
+  }
+  strands = new THREE.CanvasTexture(canvas);
+  strands.wrapS = strands.wrapT = THREE.RepeatWrapping;
+  strands.repeat.set(3, 3);
+  return strands;
+}
+
+const hairMaterial = (color: string, opacity = 1) =>
+  new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.85,
+    bumpMap: strandTexture(),
+    bumpScale: 2,
+    transparent: opacity < 1,
+    opacity,
+  });
+
+/** A faceless head: skull, jaw and ears, hair or a shemagh on top, and a beard. Faces -z. */
 function head(look: Look): THREE.Group {
   const group = new THREE.Group();
-  const skin = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11, 1), lambert(look.skin));
-  skin.scale.set(1, 1.15, 1);
-  group.add(skin);
+  const skin = new THREE.MeshStandardMaterial({ color: look.skin, roughness: 0.6 });
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.11, 32, 24), skin);
+  skull.scale.set(0.95, 1.15, 1);
+  const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.09, 24, 16), skin);
+  jaw.scale.set(0.95, 0.8, 1);
+  jaw.position.set(0, -0.055, -0.012);
+  group.add(skull, jaw);
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.026, 12, 10), skin);
+    ear.scale.set(0.45, 1, 0.75);
+    ear.position.set(side * 0.103, -0.005, 0.01);
+    group.add(ear);
+  }
 
-  const top = look.shemagh ? new THREE.MeshStandardMaterial({ map: shemaghTexture() }) : lambert(look.hair);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.118, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2.2), top);
-  cap.scale.set(1, 1.15, 1);
-  cap.position.y = 0.01;
+  const hair = hairMaterial(look.hair);
+  const top = look.shemagh ? new THREE.MeshStandardMaterial({ map: shemaghTexture(), roughness: 0.9 }) : hair;
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.117, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2.2), top);
+  cap.scale.set(0.97, 1.17, 1.03);
+  cap.position.y = 0.012;
   group.add(cap);
   if (look.shemagh) {
-    // The scarf falls down the back and sides, held by a black agal ring.
+    // The scarf falls in folds down the back and sides, held by a double black agal.
+    const drapeGeometry = new THREE.CylinderGeometry(
+      0.122,
+      0.18,
+      0.22,
+      48,
+      6,
+      true,
+      Math.PI * 0.2,
+      Math.PI * 1.6,
+    );
+    const p = drapeGeometry.attributes.position!;
+    for (let i = 0; i < p.count; i++) {
+      const lower = 0.5 - p.getY(i) / 0.22; // 0 at the top, 1 at the bottom
+      const fold = 1 + Math.sin(Math.atan2(p.getX(i), p.getZ(i)) * 9) * 0.07 * lower;
+      p.setXYZ(i, p.getX(i) * fold, p.getY(i), p.getZ(i) * fold);
+    }
+    drapeGeometry.computeVertexNormals();
     const drape = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.17, 0.2, 8, 1, true, Math.PI * 0.2, Math.PI * 1.6),
-      top,
+      drapeGeometry,
+      new THREE.MeshStandardMaterial({ map: top.map, roughness: 0.9, side: THREE.DoubleSide }),
     );
     drape.rotation.y = Math.PI;
     drape.position.y = -0.05;
-    const agal = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.012, 4, 12), lambert('#111111'));
-    agal.rotation.x = Math.PI / 2;
-    agal.position.y = 0.07;
-    group.add(drape, agal);
+    group.add(drape);
+    const agal = new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.5 });
+    for (const y of [0.066, 0.084]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.107, 0.009, 8, 40), agal);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = y;
+      group.add(ring);
+    }
+  } else {
+    // Hair down the back of the head, below the cap.
+    const back = new THREE.Mesh(
+      new THREE.SphereGeometry(0.113, 32, 12, 0, Math.PI, Math.PI * 0.35, Math.PI * 0.3),
+      hair,
+    );
+    back.scale.set(0.97, 1.15, 1.02);
+    group.add(back);
   }
 
-  const beardMat = lambert(look.hair);
+  const moustache = (thick: number) => {
+    const m = new THREE.Mesh(new THREE.CapsuleGeometry(thick, 0.045, 4, 10), hair);
+    m.rotation.z = Math.PI / 2;
+    m.position.set(0, -0.058, -0.1);
+    group.add(m);
+  };
   if (look.beard === 'full') {
     const beard = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1, 8, 4, Math.PI * 0.15, Math.PI * 0.7, Math.PI * 0.5, Math.PI * 0.4),
-      beardMat,
+      new THREE.SphereGeometry(0.1, 32, 12, Math.PI * 0.15, Math.PI * 0.7, Math.PI * 0.5, Math.PI * 0.42),
+      hair,
     );
     beard.rotation.y = Math.PI / 2;
     beard.scale.set(1.05, 1.3, 1.05);
-    beard.position.set(0, -0.015, -0.012);
+    beard.position.set(0, -0.02, -0.012);
     group.add(beard);
+    moustache(0.009);
   } else if (look.beard === 'goatee') {
-    const goatee = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.07, 5), beardMat);
+    const goatee = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.065, 16), hair);
     goatee.rotation.x = Math.PI;
-    goatee.position.set(0, -0.13, -0.075);
-    const moustache = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.014, 0.02), beardMat);
-    moustache.position.set(0, -0.06, -0.103);
-    group.add(goatee, moustache);
+    goatee.position.set(0, -0.128, -0.075);
+    group.add(goatee);
+    moustache(0.007);
   } else {
     const stubble = new THREE.Mesh(
-      new THREE.SphereGeometry(0.112, 8, 4, Math.PI * 0.15, Math.PI * 0.7, Math.PI * 0.55, Math.PI * 0.35),
-      new THREE.MeshStandardMaterial({ color: look.hair, transparent: true, opacity: 0.55 }),
+      new THREE.SphereGeometry(0.112, 32, 12, Math.PI * 0.15, Math.PI * 0.7, Math.PI * 0.55, Math.PI * 0.35),
+      hairMaterial(look.hair, 0.5),
     );
     stubble.rotation.y = Math.PI / 2;
     stubble.scale.set(1, 1.15, 1);
@@ -96,15 +182,83 @@ function head(look: Look): THREE.Group {
   return group;
 }
 
-/** A simple mitten hand: palm plus a thumb. */
-export function hand(skin: string, left: boolean): THREE.Group {
+const FINGER = new THREE.CapsuleGeometry(0.0068, 0.008, 4, 10);
+
+/**
+ * A hand: a rounded palm, four fingers with two joints and a thumb. Fingers point +y and bend by
+ * `curl` (positive toward +z, in front of the palm; negative behind it).
+ */
+export function hand(skin: string, left: boolean, curl = -0.9): THREE.Group {
   const group = new THREE.Group();
-  const mat = lambert(skin);
-  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.025), mat);
-  const thumb = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.045, 0.02), mat);
-  thumb.position.set(left ? 0.035 : -0.035, -0.005, -0.012);
-  thumb.rotation.z = left ? -0.6 : 0.6;
-  group.add(palm, thumb);
+  const mat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.6 });
+  group.add(new THREE.Mesh(new RoundedBoxGeometry(0.055, 0.06, 0.022, 3, 0.009), mat));
+  const side = left ? 1 : -1; // the thumb's side
+  [0.03, 0.033, 0.031, 0.026].forEach((length, i) => {
+    const base = new THREE.Group();
+    base.position.set(side * (0.0195 - i * 0.013), 0.027, 0);
+    base.rotation.x = curl * 0.5;
+    const near = new THREE.Mesh(FINGER, mat);
+    near.scale.y = (length * 0.55) / 0.022;
+    near.position.y = length * 0.275;
+    const joint = new THREE.Group();
+    joint.position.y = length * 0.55;
+    joint.rotation.x = curl * 0.8;
+    const far = new THREE.Mesh(FINGER, mat);
+    far.scale.set(0.92, (length * 0.45) / 0.022, 0.92);
+    far.position.y = length * 0.2;
+    joint.add(far);
+    base.add(near, joint);
+    group.add(base);
+  });
+  const thumb = new THREE.Mesh(FINGER, mat);
+  thumb.scale.set(1.15, 1.4, 1.15);
+  thumb.position.set(side * 0.031, -0.004, 0.009);
+  thumb.rotation.z = -side * 0.75;
+  group.add(thumb);
+  return group;
+}
+
+/** An istikana: a small waisted tea glass with a gold rim, dark amber tea inside. */
+export function istikana(): THREE.Group {
+  const group = new THREE.Group();
+  const outline = (points: number[][]) => points.map(([x, y]) => new THREE.Vector2(x, y));
+  const glass = new THREE.Mesh(
+    new THREE.LatheGeometry(
+      outline([
+        [0, 0],
+        [0.015, 0],
+        [0.016, 0.004],
+        [0.012, 0.028],
+        [0.0135, 0.04],
+        [0.018, 0.058],
+        [0.0185, 0.06],
+      ]),
+      24,
+    ),
+    new THREE.MeshStandardMaterial({ color: '#fff8ee', transparent: true, opacity: 0.3, roughness: 0.05 }),
+  );
+  glass.renderOrder = 1; // drawn after the tea so the tea shows through
+  const tea = new THREE.Mesh(
+    new THREE.LatheGeometry(
+      outline([
+        [0, 0.003],
+        [0.014, 0.004],
+        [0.011, 0.028],
+        [0.0125, 0.04],
+        [0.0155, 0.048],
+        [0, 0.048],
+      ]),
+      24,
+    ),
+    new THREE.MeshStandardMaterial({ color: '#8a2e0c', roughness: 0.15, transparent: true, opacity: 0.92 }),
+  );
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(0.0185, 0.0012, 6, 24),
+    new THREE.MeshStandardMaterial({ color: '#d9a441', metalness: 0.9, roughness: 0.3 }),
+  );
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 0.06;
+  group.add(tea, glass, rim);
   return group;
 }
 
@@ -177,21 +331,14 @@ function snackTray(): THREE.Group {
     mesh.position.set(x, y, z);
     tray.add(mesh);
   };
-  // Istikana: a small waisted tea glass on a saucer, amber tea inside.
+  // Istikana on a saucer.
   at(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.006, 10), lambert('#e9dcc0')),
+    new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.006, 24), lambert('#e9dcc0')),
     -0.08,
     0.011,
     0.05,
   );
-  const glass = new THREE.Mesh(
-    new THREE.LatheGeometry(
-      [new THREE.Vector2(0.016, 0), new THREE.Vector2(0.012, 0.03), new THREE.Vector2(0.019, 0.06)],
-      8,
-    ),
-    new THREE.MeshStandardMaterial({ color: '#b5501c', transparent: true, opacity: 0.85, roughness: 0.1 }),
-  );
-  at(glass, -0.08, 0.014, 0.05);
+  at(istikana(), -0.08, 0.014, 0.05);
   // Bowls of seeds and chips.
   const bowl = (color: string, fill: string, x: number, z: number) => {
     at(

@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { PLAYER_COLORS } from './board';
-import { LOOKS, hand } from './players';
+import { LOOKS, hand, istikana } from './players';
 
 // Screen layout units; the canvas is drawn at RES times that so text stays sharp at full resolution.
 export const SCREEN = { w: 104, h: 180 };
@@ -31,8 +31,8 @@ export function layout(kinds: RowKind[]): { y: number; h: number }[] {
 
 const GOLD = '#d9a441';
 const CREAM = '#f3e2c4';
-const REST = new THREE.Vector3(0.095, -0.06, -0.16);
-const SIP = new THREE.Vector3(0.055, -0.03, -0.11);
+const REST = new THREE.Vector3(0.13, -0.075, -0.2);
+const SIP = new THREE.Vector3(0.075, -0.035, -0.14);
 
 type Row = { el: HTMLElement; y: number; h: number };
 
@@ -46,7 +46,7 @@ export class Phone {
   private texture = new THREE.CanvasTexture(this.canvas);
   private screen: THREE.Mesh;
   private tea = new THREE.Group();
-  private glass: THREE.Mesh;
+  private glass: THREE.Group;
   private rows: Row[] = [];
   private hover: HTMLElement | null = null;
   private dirty = true;
@@ -84,27 +84,24 @@ export class Phone {
       new THREE.MeshBasicMaterial({ map: this.texture }), // lit by itself, like a real screen
     );
     this.screen.position.z = 0.0036;
-    const left = hand(skin, true);
-    left.scale.setScalar(0.55);
-    left.position.set(-SCREEN_W / 2 - 0.006, -SCREEN_H / 2 + 0.02, -0.006);
-    left.rotation.z = -0.35;
+    // Held from the bottom left corner, fingers curling up behind the phone.
+    const left = hand(skin, true, -1.1);
+    left.scale.setScalar(0.8);
+    left.position.set(-SCREEN_W / 2 + 0.002, -SCREEN_H / 2 + 0.004, -0.009);
+    left.rotation.z = -0.6;
     const phone = new THREE.Group();
     phone.add(body, band, slot, this.screen, left);
     phone.position.set(-0.02, -0.004, -0.125);
     phone.rotation.set(-0.04, 0.08, 0.02);
 
-    // Right hand with an istikana of tea.
-    this.glass = new THREE.Mesh(
-      new THREE.LatheGeometry(
-        [new THREE.Vector2(0.016, 0), new THREE.Vector2(0.012, 0.03), new THREE.Vector2(0.019, 0.06)],
-        8,
-      ),
-      new THREE.MeshBasicMaterial({ color: '#d8752a', transparent: true, opacity: 0.9 }), // glowing tea
-    );
-    this.glass.scale.setScalar(1.3);
-    this.glass.position.set(-0.03, -0.04, 0.02);
-    this.tea.add(hand(skin, false), this.glass);
-    this.tea.scale.setScalar(0.6);
+    // Right hand holding an istikana from the side, like you would: palm facing the glass,
+    // fingers pointing away and wrapping round it, the glass to the left of the hand.
+    const right = hand(skin, false, 1.2);
+    right.rotation.set(-Math.PI / 2, 0, Math.PI / 2, 'ZYX');
+    this.glass = istikana();
+    this.glass.position.set(-0.03, -0.03, -0.022);
+    this.tea.add(right, this.glass);
+    this.tea.scale.setScalar(0.9);
 
     this.group.add(phone, this.tea);
     this.group.name = 'phone';
