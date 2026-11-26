@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { type Card, cardName, isRed } from '../domain/cards';
 
 const SEAT_RADIUS = 1.25;
-const OWN_Y = 0.6; // your cards sit low, at the bottom of your view, so the board stays clear
+const OWN_Y = -0.25; // camera space: your cards sit low in your view so the board stays clear
 const OTHER_Y = 0.6;
 
 const lambert = (color: string) => new THREE.MeshLambertMaterial({ color });
@@ -157,6 +157,7 @@ function fan(cards: (Card | 'back')[]): THREE.Group {
       new THREE.MeshLambertMaterial({ map: cardTexture(card), side: THREE.DoubleSide }),
     );
     mesh.position.set(t * spread * Math.min(1, cards.length / 4), -Math.abs(t) * 0.02, i * 0.002);
+    mesh.userData = { card, baseY: mesh.position.y };
     mesh.rotation.z = -t * 0.5;
     group.add(mesh);
   });
@@ -238,8 +239,10 @@ export class Players {
   readonly group = new THREE.Group();
   private seats: Seat[] = [];
   private me = 0;
+  private selected: Card | null = null;
 
-  constructor() {
+  /** Your own hands ride on the camera, so your cards stay at the bottom of the view in every camera mode. */
+  constructor(private camera: THREE.Camera) {
     for (let s = 0; s < 4; s++) {
       const group = new THREE.Group();
       group.rotation.y = (s * Math.PI) / 2;
@@ -247,8 +250,6 @@ export class Players {
       const h = head(look);
       h.position.set(0, 0.92, SEAT_RADIUS);
       const hands = new THREE.Group();
-      hands.position.set(0, 0.6, SEAT_RADIUS - 0.3);
-      hands.rotation.x = -0.35; // cards tilted toward their owner
       const left = hand(look.skin, true);
       left.position.set(-0.09, -0.02, 0.01);
       const right = hand(look.skin, false);
@@ -264,13 +265,22 @@ export class Players {
     this.setSeat(0);
   }
 
-  /** Which seat is you: your own head is hidden and your hands come close to your eyes. */
+  /** Which seat is you: your own head is hidden and your hands move onto the camera. */
   setSeat(seat: number): void {
     this.me = seat;
     this.seats.forEach((s, i) => {
       s.head.visible = i !== seat;
-      s.hands.position.set(0, i === seat ? OWN_Y : OTHER_Y, SEAT_RADIUS - (i === seat ? 0.27 : 0.3));
-      s.hands.rotation.x = i === seat ? -1.0 : -0.35;
+      if (i === seat) {
+        this.camera.add(s.hands);
+        s.hands.position.set(0, OWN_Y, -0.4);
+        s.hands.scale.setScalar(0.75);
+        s.hands.rotation.set(-0.3, 0, 0);
+      } else {
+        s.group.add(s.hands);
+        s.hands.position.set(0, OTHER_Y, SEAT_RADIUS - 0.3);
+        s.hands.scale.setScalar(1);
+        s.hands.rotation.set(-0.35, 0, 0); // cards tilted toward their owner
+      }
     });
   }
 
@@ -283,11 +293,23 @@ export class Players {
       if (key === s.shown) return;
       s.shown = key;
       s.cards.clear();
-      // Cards face their owner, who sits at +z in the seat group.
-      const f = fan(cards);
+      const f = fan(cards); // faces +z, toward the owner
       f.position.set(0, 0.03, 0);
       s.cards.add(f);
     });
+    this.select(this.selected);
+  }
+
+  /** Your card meshes, for clicking. Each has `userData.card`. */
+  ownCards(): THREE.Object3D[] {
+    return this.seats[this.me]!.cards.children[0]?.children ?? [];
+  }
+
+  /** Lift the chosen card out of the fan (or none). */
+  select(card: Card | null): void {
+    this.selected = card;
+    for (const mesh of this.ownCards())
+      mesh.position.y = mesh.userData.baseY + (mesh.userData.card === card ? 0.025 : 0);
   }
 
   update(time: number, turn: number | null): void {
@@ -296,7 +318,10 @@ export class Players {
       s.head.position.y = 0.92 + bob;
       s.head.lookAt(0, 0.4, 0); // everyone watches the board
       s.head.rotateY(Math.PI); // our heads are built facing -z; lookAt points +z
-      s.hands.position.y = (i === this.me ? OWN_Y : OTHER_Y) + bob + (turn === i ? 0.03 : 0);
+      s.hands.position.y =
+        (i === this.me ? OWN_Y : OTHER_Y) +
+        bob * (i === this.me ? 0.3 : 1) +
+        (turn === i && i !== this.me ? 0.03 : 0);
     });
   }
 }

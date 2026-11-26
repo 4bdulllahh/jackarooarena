@@ -3,7 +3,6 @@ import { cardName } from '../domain/cards';
 import type { Play } from '../domain/game';
 import { MAX_NAME } from '../domain/lobby';
 import { isRoomCode } from '../domain/roomCode';
-import { describePlay, drawBoard } from '../debug/board2d';
 
 interface LobbyView {
   seats: ({ name: string; you: boolean } | null)[];
@@ -34,7 +33,7 @@ export interface TableHooks {
   onGame(view: GameView): void;
 }
 
-export function startLobbyUi(root: HTMLElement, hooks: TableHooks): void {
+export function startLobbyUi(root: HTMLElement, hooks: TableHooks): { play(play: Play): void } {
   const codeFromUrl = location.pathname.slice(1).toUpperCase();
   root.innerHTML = `
     <form id="entry">
@@ -49,10 +48,7 @@ export function startLobbyUi(root: HTMLElement, hooks: TableHooks): void {
       <button type="button" id="start" hidden>Start game</button>
     </section>
     <section id="game" hidden>
-      <canvas id="board" width="640" height="640" aria-label="Board"></canvas>
       <p id="turn" role="status"></p>
-      <p id="hand"></p>
-      <div id="plays"></div>
       <button type="button" id="rematch" hidden>Rematch</button>
     </section>
     <p id="message" role="alert"></p>`;
@@ -126,16 +122,6 @@ export function startLobbyUi(root: HTMLElement, hooks: TableHooks): void {
 
   function renderGame(view: GameView) {
     $('game').hidden = false;
-    drawBoard($<HTMLCanvasElement>('board').getContext('2d')!, view.marbles);
-    $('hand').textContent = `Your cards: ${view.hand.map(cardName).join('  ') || '(none)'}`;
-    $('plays').replaceChildren(
-      ...view.plays.map((play) => {
-        const button = document.createElement('button');
-        button.textContent = describePlay(play);
-        button.onclick = () => send({ t: 'play', play });
-        return button;
-      }),
-    );
     $('rematch').hidden = view.winner === null || lobby?.you !== lobby?.hostSeat;
     renderTurn();
   }
@@ -182,4 +168,5 @@ export function startLobbyUi(root: HTMLElement, hooks: TableHooks): void {
   if (isRoomCode(codeFromUrl) && nameInput.value && localStorage.getItem(`id:${codeFromUrl}`))
     void roomExists(codeFromUrl).then((ok) => ok && connect(codeFromUrl));
   $('copy').onclick = () => navigator.clipboard.writeText(location.href).then(() => say('Link copied.'));
+  return { play: (play) => send({ t: 'play', play }) };
 }

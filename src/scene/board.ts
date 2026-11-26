@@ -117,6 +117,8 @@ interface Hop {
 }
 
 const HOP_MS = 110;
+/** World position of a marble sitting in a hole. */
+export const holeWorld = (pos: number, marble: number) => toWorld(holeAt(pos, marble));
 const toWorld = ([x, z]: [number, number]) =>
   new THREE.Vector3(x * BOARD_RADIUS, BOARD_TOP + MARBLE * 0.45, z * BOARD_RADIUS);
 
@@ -164,6 +166,7 @@ export class Board {
       const material = new THREE.MeshPhongMaterial({ color: PLAYER_COLORS[ownerOf(m)], shininess: 80 });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.copy(toWorld(holeAt(BASE, m)));
+      mesh.userData.marble = m;
       this.marbles.push(mesh);
       this.group.add(mesh);
     }
@@ -201,7 +204,25 @@ export class Board {
     return start;
   }
 
+  private lit = new Set<number>();
+
+  /** Marble meshes, for clicking. Each has `userData.marble`. */
+  marbleMeshes(): THREE.Object3D[] {
+    return this.marbles;
+  }
+
+  /** Make these marbles glow (the ones the chosen card can move). */
+  highlight(marbles: Iterable<number>): void {
+    this.lit = new Set(marbles);
+    this.marbles.forEach((mesh, m) => {
+      if (!this.lit.has(m)) (mesh.material as THREE.MeshPhongMaterial).emissive.setScalar(0);
+    });
+  }
+
   update(now = performance.now()): void {
+    const glow = 0.25 + Math.sin(now / 150) * 0.15;
+    for (const m of this.lit)
+      (this.marbles[m]!.material as THREE.MeshPhongMaterial).emissive.setRGB(glow, glow * 0.8, glow * 0.4);
     this.hops.forEach((queue, m) => {
       const hop = queue[0];
       if (!hop || now < hop.start) return;

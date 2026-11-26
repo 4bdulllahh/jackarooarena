@@ -43,10 +43,12 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/domain/bot.ts` | `botPlay(game, player, random)`: tries every legal play, keeps the one that leaves its team furthest ahead (kills, home, sabotage fall out of the score), saves A/K/5/7 on ties |
 | `src/domain/game.ts` | Whole game: `newGame`, `legalPlays(game, player)`, `applyPlay(game, player, play, random)` (null = illegal), `viewFor` (what one player may see). Plays: exit, move, king, split, swap, burnNext (red 10), pickNext (red Q), burn, pickBurn |
 | `debug.html`, `src/debug/main.ts` | Dev-only rules debug board at http://localhost:5173/debug.html: 2D canvas board, your legal plays as buttons, 3 bots, play log. Not in the production build (Vite only builds `index.html`) |
-| `src/main.ts` | Client entry: renderer, majlis + board, camera rig turned to your seat. Dev URL options: `?cam=overview`, `?cam=top`, `?demo` (local bot game on the 3D board) |
+| `src/main.ts` | Client entry: renderer, scene, camera rig turned to your seat, `V` glides between seat and top-down poses. Dev URL options: `?cam=overview`, `?cam=top`, `?demo` (you play seat 0 against bots, no server), `?demo=auto` (bots only) |
 | `src/scene/board.ts` | 3D board: grooves, numbers, coloured starts, home lanes, bases and centre star painted on one canvas texture; 16 marbles. `setPositions(marbles)` animates hole-by-hole hops (kills fly back to base after the killer lands); `onLand(marble)` hook for sounds; `route` tested |
 | `src/scene/majlis.ts` | The room: walls with arch niches and star frieze, wood ceiling and beams, carpet, Sadu floor seating along the walls, low round table (`TABLE_HEIGHT` 0.34, `TABLE_RADIUS` 0.8) with 4 player cushions, brass chandelier. 2 lights only (hemisphere + chandelier point light) |
 | `src/scene/players.ts` | `Players`: 4 faceless low-poly heads (hair/shemagh + beard styles), mitten hands holding a card fan (yours face up, others face down by `handSizes`), snack tray per seat (istikana tea, seeds, chips, water). `setSeat`, `setCards`, `update(time, turn)`; the player whose turn it is lifts their cards |
+| `src/scene/controls.ts` | Playing in 3D: click a card (or number keys), movable marbles glow, click a marble, glowing discs mark destinations, click to play; `#choices` panel lists the same options as buttons (keyboard, 7 splits, burns, red Q picks). `landing(marbles, me, play)` = which marble a play moves and where (tested) |
+| `tools/shot.mjs` | Browser check: `node tools/shot.mjs <url> <out-dir> wait:<ms> key:<Key> click:<x>,<y> shot:<name> text:<selector>` drives the installed Edge (playwright-core) and reports page errors |
 | `src/scene/textures.ts` | Procedural canvas textures (plaster, wood, carpet, Sadu weave, frieze, brass), small and nearest-filtered |
 | `src/scene/retro.ts` | PS1/CRT look: renders at 240 px tall, upscales with 15-bit colour, dithering, vignette, scanlines; `snapVertices` adds the PS1 vertex wobble to every material |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (claims a free code in its Durable Object), `GET /api/rooms/:code` (exists/full/started), `/api/rooms/:code/ws` (WebSocket). `Room` Durable Object: hibernating WebSockets, lobby saved in storage under `lobby`, empty rooms deleted by an alarm after 1 hour |
@@ -96,8 +98,8 @@ browser and take a screenshot.
 | M8 | 3D majlis: room, low table, warm light, chandelier, PS1/CRT look | M | ✅ done |
 | M9 | 3D board: wooden board, grooves, marbles, movement | M | ✅ done |
 | M10 | Players: floating heads, hands with cards, snack trays | M | ✅ done |
-| M11 | Cameras (first person / top-down, `V`) + picking cards and marbles + legal move highlights | M | next |
-| M12 | Procedural sound, mute toggle | M | |
+| M11 | Cameras (first person / top-down, `V`) + picking cards and marbles + legal move highlights | M | ✅ done |
+| M12 | Procedural sound, mute toggle | M | next |
 | M13 | Taunts / quick emotes with sounds | S | |
 | M14 | Phone menu: phone left hand, tea right, Play / Chaos (soon) / Settings, name, room code | M | |
 | M15 | How to play screen + settings (volume sliders, graphics low/high) | M | |
@@ -117,12 +119,13 @@ browser and take a screenshot.
 | M7 | M | 19% | 22% |
 | M8 | M | 22% | 24% |
 | M9 | M | 24% | 27% |
-| M10 | M | 27% | ? |
+| M10 | M | 27% | 29% |
+| M11 | M | 29% | ? |
 
 ## Current state
 
-- **Last done:** M10. Players around the table: 3 floating heads watching the board, everyone's hands holding cards, your own cards face up at the bottom of your view, a snack tray by each cushion, and the "resemblance is coincidence" footer. Checked with headless screenshots (seat and overview, `?demo`). Your neighbours' heads are large and cut off at the screen edges from the seat view: ask the user if that's fine.
-- **Next:** M11 cameras + 3D play controls. `V` toggles seat view / top-down (lerp between the two; top-down needs `camera.up` set so your seat is at the bottom). Click a card in your fan to pick it (raycast on the card meshes), then the marbles it can move light up (from the server's `plays` list) and their target holes glow; click a marble/hole to play. Special plays (7 split, swap target, red 10/Q, burn) need a small chooser; keep the 2D button list as a fallback until then. Keyboard: number keys pick cards, Enter confirms (accessibility).
+- **Last done:** M11. `V` toggles seat / top-down view; your cards ride on the camera at the bottom of the screen; play by clicking card, marble, glowing target, or with the `#choices` panel / number keys. Verified in Edge with playwright-core: 3D card clicks select cards, an A played by clicking the start-tile disc, no page errors. The 2D board is gone from the online page (still on `/debug.html`).
+- **Next:** M12 procedural sound in `src/scene/sound.ts` with Web Audio, no files: marble drop into a groove (short wooden "tok" with a resonant body, slight random pitch), clack when marbles hit (kills), card flick (filtered noise burst) when cards are played/dealt, a soft whoosh for the camera toggle, low warm room tone. Hook `board.onLand`, kills (a marble going to `BASE`), `players.setCards` changes, turn start ping for you. Mute toggle (`M` key + button), saved in localStorage. Audio must start after the first click (browser autoplay rules).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.
