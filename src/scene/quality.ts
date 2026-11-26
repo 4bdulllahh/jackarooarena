@@ -14,7 +14,8 @@ export const PRESETS: Record<Quality, Preset> = {
   high: { pixelRatio: 2, shadows: 2048, bloom: true, samples: 4 },
 };
 
-const isQuality = (q: unknown): q is Quality => q === 'low' || q === 'medium' || q === 'high';
+export const QUALITIES: Quality[] = ['low', 'medium', 'high'];
+const isQuality = (q: unknown): q is Quality => QUALITIES.includes(q as Quality);
 
 /** The saved setting; `?q=low` in the URL overrides it for testing. */
 export function getQuality(): Quality {
@@ -22,4 +23,8 @@ export function getQuality(): Quality {
   if (isQuality(url)) return url;
   const saved = localStorage.getItem('graphics');
   return isQuality(saved) ? saved : 'medium';
+}
+
+export function setQuality(quality: Quality): void {
+  localStorage.setItem('graphics', quality);
 }

@@ -16,18 +16,38 @@ const SCREEN_H = (SCREEN_W * SCREEN.h) / SCREEN.w;
 const TOP = 15; // below the status bar
 const GAP = 3;
 
-export type RowKind = 'title' | 'control' | 'text';
-const HEIGHT: Record<RowKind, number> = { title: 22, control: 18, text: 13 };
+export type RowKind = 'title' | 'control' | 'text' | 'para';
+const HEIGHT: Record<RowKind, number> = { title: 22, control: 18, text: 13, para: 0 };
+const LINE = 10; // paragraph line height
+const PARA_FONT = '8px system-ui, sans-serif';
 
-/** Where each row sits on the screen, top to bottom. */
-export function layout(kinds: RowKind[]): { y: number; h: number }[] {
+/** Where each row sits on the screen, top to bottom. Paragraphs are as tall as their lines. */
+export function layout(rows: { kind: RowKind; lines?: number }[]): { y: number; h: number }[] {
   let y = TOP;
-  return kinds.map((kind) => {
-    const row = { y, h: HEIGHT[kind] };
+  return rows.map(({ kind, lines = 1 }) => {
+    const row = { y, h: kind === 'para' ? lines * LINE + 4 : HEIGHT[kind] };
     y += row.h + GAP;
     return row;
   });
 }
+
+/** Split text into lines that fit `width` in the current font. */
+function wrap(g: CanvasRenderingContext2D, text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && g.measureText(next).width > width) {
+      lines.push(line);
+      line = word;
+    } else line = next;
+  }
+  return line ? [...lines, line] : lines;
+}
+
+const isSlider = (el: HTMLElement): el is HTMLInputElement =>
+  el instanceof HTMLInputElement && el.type === 'range';
+const BAR = { from: 46, to: 92 }; // where a slider's bar sits across the screen
 
 const GOLD = '#d9a441';
 const CREAM = '#f3e2c4';
@@ -41,6 +61,10 @@ export class Phone {
   /** 1 while the phone is up, 0 once it's lowered out of view (eased). */
   shown = 1;
   private up = true;
+  /** Whether the phone is up (or on its way up). */
+  get isUp(): boolean {
+    return this.up;
+  }
   private canvas = document.createElement('canvas');
   private g = this.canvas.getContext('2d')!;
   private texture = new THREE.CanvasTexture(this.canvas);
@@ -117,15 +141,22 @@ export class Phone {
     for (const type of ['focusin', 'focusout', 'input', 'selectionchange'])
       document.addEventListener(type, redraw);
 
+    // Registered before the game controls, so a click on the raised phone never reaches the board.
     view.addEventListener('click', (e) => {
-      const el = this.rowAt(e);
+      const hit = this.hit(e);
+      if (!hit) return;
+      e.stopImmediatePropagation();
+      const el = hit.el;
       if (!el) return;
       el.focus();
-      if (el instanceof HTMLInputElement) el.setSelectionRange(el.value.length, el.value.length);
+      if (isSlider(el)) slide(el, hit.x);
+      else if (el instanceof HTMLInputElement) el.setSelectionRange(el.value.length, el.value.length);
       else el.click();
     });
     view.addEventListener('pointermove', (e) => {
-      const el = this.rowAt(e);
+      const hit = this.hit(e);
+      const el = hit?.el ?? null;
+      if (el && isSlider(el) && e.buttons === 1) slide(el, hit!.x); // dragging a slider
       if (el === this.hover) return;
       this.hover = el;
       view.style.cursor = el ? 'pointer' : '';
@@ -133,7 +164,7 @@ export class Phone {
     });
     addEventListener('keydown', (e) => {
       if (!this.up || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
-      const list = this.rows.map((r) => r.el).filter(usable);
+      const list = this.visibleRows().filter(usable); // from the page, not the last frame drawn
       const at = list.indexOf(document.activeElement as HTMLElement);
       const next = list[(at + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length];
       if (!next) return;
@@ -179,7 +210,8 @@ export class Phone {
     if (this.dirty) this.draw(tick[0] === '0');
   }
 
-  private rowAt(e: MouseEvent): HTMLElement | null {
+  /** Where on the phone screen the pointer is (null when it's off the screen) and which row it's on. */
+  private hit(e: MouseEvent): { el: HTMLElement | null; x: number } | null {
     if (!this.up) return null;
     const rect = this.view.getBoundingClientRect();
     const ndc = new THREE.Vector2(
@@ -192,7 +224,14 @@ export class Phone {
     const x = uv.x * SCREEN.w;
     const y = (1 - uv.y) * SCREEN.h;
     const row = this.rows.find((r) => y >= r.y && y < r.y + r.h && x >= 6 && x <= SCREEN.w - 6);
-    return row && usable(row.el) ? row.el : null;
+    return { el: row && usable(row.el) ? row.el : null, x };
+  }
+
+  /** The form's rows on the current screen, top to bottom (empty text rows left out). */
+  private visibleRows(): HTMLElement[] {
+    return [...this.root.querySelectorAll<HTMLElement>('[data-row]')].filter(
+      (el) => !el.closest('[hidden]') && (el instanceof HTMLInputElement || el.textContent!.trim()),
+    );
   }
 
   private draw(caret: boolean): void {
@@ -214,17 +253,17 @@ export class Phone {
     g.fillRect(w - 15, 4, 9, 5);
     g.fillRect(w - 6, 5, 1, 3);
 
-    const els = [...this.root.querySelectorAll<HTMLElement>('[data-row]')].filter(
-      (el) => !el.closest('[hidden]') && (el instanceof HTMLInputElement || el.textContent!.trim()),
-    );
+    const els = this.visibleRows();
     const kinds = els.map((el): RowKind =>
-      el.dataset.row === 'title'
-        ? 'title'
+      el.dataset.row === 'title' || el.dataset.row === 'para'
+        ? el.dataset.row
         : el instanceof HTMLButtonElement || el instanceof HTMLInputElement || el.dataset.seat !== undefined
           ? 'control'
           : 'text',
     );
-    const spots = layout(kinds);
+    g.font = PARA_FONT;
+    const paras = els.map((el, i) => (kinds[i] === 'para' ? wrap(g, el.textContent!.trim(), w - 16) : []));
+    const spots = layout(kinds.map((kind, i) => ({ kind, lines: paras[i]!.length })));
     this.rows = els.map((el, i) => ({ el, ...spots[i]! }));
 
     for (const [i, { el, y, h: rh }] of this.rows.entries()) {
@@ -240,6 +279,13 @@ export class Phone {
         g.fillText(text, w / 2, y + rh / 2, rw);
         continue;
       }
+      if (kind === 'para') {
+        g.font = PARA_FONT;
+        g.textAlign = 'left';
+        g.fillStyle = CREAM;
+        paras[i]!.forEach((line, n) => g.fillText(line, 8, y + 2 + LINE * (n + 0.5)));
+        continue;
+      }
       if (kind === 'text') {
         g.font = '8px system-ui, sans-serif';
         g.textAlign = 'center';
@@ -250,6 +296,21 @@ export class Phone {
       const disabled = !usable(el);
       const hovered = this.hover === el;
       let left = x + 5;
+      if (isSlider(el)) {
+        box(g, x, y, rw, rh, GOLD, focused ? '#4e321f' : '#3a2417', focused ? 2 : 1);
+        g.font = 'bold 9px system-ui, sans-serif';
+        g.textAlign = 'left';
+        g.fillStyle = CREAM;
+        g.fillText(el.dataset.label ?? '', left, y + rh / 2, BAR.from - left - 3);
+        const t = (Number(el.value) - Number(el.min)) / (Number(el.max) - Number(el.min));
+        const knob = BAR.from + (BAR.to - BAR.from) * t;
+        g.fillStyle = '#1a0f08';
+        g.fillRect(BAR.from, y + rh / 2 - 1.5, BAR.to - BAR.from, 3);
+        g.fillStyle = GOLD;
+        g.fillRect(BAR.from, y + rh / 2 - 1.5, knob - BAR.from, 3);
+        g.fillRect(knob - 2, y + 4, 4, rh - 8);
+        continue;
+      }
       if (el instanceof HTMLInputElement) {
         box(g, x, y, rw, rh, focused ? GOLD : '#8a6a3a', '#f4ead6', focused ? 2 : 1);
         g.font = 'bold 9px system-ui, sans-serif';
@@ -283,6 +344,13 @@ export class Phone {
     }
     this.texture.needsUpdate = true;
   }
+}
+
+/** Set a slider from where it was clicked on the phone, and tell its listeners. */
+function slide(el: HTMLInputElement, x: number): void {
+  const t = Math.min(1, Math.max(0, (x - BAR.from) / (BAR.to - BAR.from)));
+  el.value = String(Number(el.min) + t * (Number(el.max) - Number(el.min)));
+  el.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 /** A row that can take focus: an input, or a button that isn't disabled. */

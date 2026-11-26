@@ -3,6 +3,7 @@
 import { cardName } from '../domain/cards';
 import type { Play } from '../domain/game';
 import { MAX_NAME } from '../domain/lobby';
+import { RULES } from './rules';
 import { isRoomCode } from '../domain/roomCode';
 import { type TauntId, isTaunt } from '../domain/taunts';
 
@@ -40,14 +41,22 @@ export interface TableHooks {
 export function startLobbyUi(
   root: HTMLElement,
   hooks: TableHooks,
-): { play(play: Play): void; taunt(id: TauntId): void } {
+): { play(play: Play): void; taunt(id: TauntId): void; menu(): void } {
   const codeFromUrl = location.pathname.slice(1).toUpperCase();
   root.innerHTML = `
     <section id="home">
       <h1 data-row="title">JackarooArena</h1>
-      <button type="button" data-row data-go="entry">Play</button>
-      <button type="button" data-row disabled>Chaos (coming soon)</button>
+      <button type="button" data-row data-go="entry" id="go-play">Play</button>
+      <button type="button" data-row disabled id="chaos">Chaos (coming soon)</button>
+      <button type="button" data-row id="go-rules">How to play</button>
       <button type="button" data-row data-go="settings">Settings</button>
+      <button type="button" data-row id="resume" hidden>Back to the game</button>
+    </section>
+    <section id="rules" hidden>
+      <h2 data-row="title" id="rules-title"></h2>
+      <p data-row="para" id="rules-text"></p>
+      <button type="button" data-row id="rules-next">Next</button>
+      <button type="button" data-row id="rules-back">Back</button>
     </section>
     <form id="entry" hidden>
       <h2 data-row="title">Play</h2>
@@ -59,8 +68,10 @@ export function startLobbyUi(
     </form>
     <section id="settings" hidden>
       <h2 data-row="title">Settings</h2>
-      <button type="button" data-row id="sound">Sound: on (M)</button>
-      <p data-row>More settings soon</p>
+      <input type="range" data-row data-label="Master" id="volume-master" min="0" max="100" step="5" aria-label="Master volume" />
+      <input type="range" data-row data-label="Effects" id="volume-effects" min="0" max="100" step="5" aria-label="Effects volume" />
+      <input type="range" data-row data-label="Taunts" id="volume-taunts" min="0" max="100" step="5" aria-label="Taunts volume" />
+      <button type="button" data-row id="graphics">Graphics</button>
       <button type="button" data-row data-go="home">Back</button>
     </section>
     <section id="room" hidden>
@@ -73,17 +84,36 @@ export function startLobbyUi(
     <p id="message" data-row role="alert"></p>`;
 
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-  const SCREENS = ['home', 'entry', 'settings', 'room'];
-  function show(screen: string) {
-    for (const s of SCREENS) $(s).hidden = s !== screen;
+  const SCREENS = ['home', 'entry', 'settings', 'rules', 'room'];
+  let screen = 'home';
+  function show(next: string) {
+    screen = next;
+    for (const s of SCREENS) $(s).hidden = s !== next;
     say('');
-    $(screen).querySelector<HTMLElement>('input, button:not(:disabled)')?.focus();
+    $(next).querySelector<HTMLElement>('input, button:not(:disabled):not([hidden])')?.focus();
   }
   for (const button of root.querySelectorAll<HTMLElement>('[data-go]'))
     button.onclick = () => show(button.dataset.go!);
+  // Esc steps back to the main screen; the page then leaves Esc alone (preventDefault).
   root.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && ($('entry').hidden === false || $('settings').hidden === false)) show('home');
+    if (e.key !== 'Escape' || screen === 'home' || screen === 'room') return;
+    e.preventDefault();
+    show('home');
   });
+
+  let page = 0;
+  function showPage(n: number) {
+    page = n;
+    $('rules-title').textContent = `How to play ${n + 1}/${RULES.length}`;
+    $('rules-text').textContent = RULES[n]!;
+    $('rules-next').textContent = n === RULES.length - 1 ? 'Done' : 'Next';
+  }
+  $('go-rules').onclick = () => {
+    showPage(0);
+    show('rules');
+  };
+  $('rules-next').onclick = () => (page === RULES.length - 1 ? show('home') : showPage(page + 1));
+  $('rules-back').onclick = () => (page === 0 ? show('home') : showPage(page - 1));
   const nameInput = $<HTMLInputElement>('name');
   const codeInput = $<HTMLInputElement>('code');
   nameInput.value = localStorage.getItem('name') ?? '';
@@ -156,6 +186,9 @@ export function startLobbyUi(
 
   function renderGame(view: GameView) {
     $('game').hidden = false;
+    // In a game the phone is a pause menu: no Play or Chaos, a way back to the table instead.
+    $('go-play').hidden = $('chaos').hidden = true;
+    $('resume').hidden = false;
     $('rematch').hidden = view.winner === null || lobby?.you !== lobby?.hostSeat;
     renderTurn();
   }
@@ -215,5 +248,9 @@ export function startLobbyUi(
   if (isRoomCode(codeFromUrl) && nameInput.value && localStorage.getItem(`id:${codeFromUrl}`))
     void roomExists(codeFromUrl).then((ok) => ok && connect(codeFromUrl));
   $('copy').onclick = () => navigator.clipboard.writeText(location.href).then(() => say('Link copied.'));
-  return { play: (play) => send({ t: 'play', play }), taunt: (id) => send({ t: 'taunt', id }) };
+  return {
+    play: (play) => send({ t: 'play', play }),
+    taunt: (id) => send({ t: 'taunt', id }),
+    menu: () => show('home'),
+  };
 }

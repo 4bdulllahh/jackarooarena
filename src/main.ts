@@ -8,9 +8,9 @@ import { Controls } from './scene/controls';
 import { buildMajlis, setShadows } from './scene/majlis';
 import { Phone } from './scene/phone';
 import { Players } from './scene/players';
-import { PRESETS, getQuality } from './scene/quality';
+import { PRESETS, QUALITIES, getQuality, setQuality } from './scene/quality';
 import { Retro } from './scene/retro';
-import { isMuted, setMuted, sounds } from './scene/sound';
+import { type Channel, getVolume, isMuted, setMuted, setVolume, sounds } from './scene/sound';
 import { TAUNTS, type TauntId, killed, tauntLabel } from './domain/taunts';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
@@ -43,18 +43,16 @@ scene.environmentIntensity = 0.45;
 board.onLand = (_marble, final) => (final ? sounds.drop() : sounds.tick());
 board.onKill = () => sounds.clack();
 
-// The sound toggle is both a corner button and a row in the phone's Settings.
+const muteButton = document.querySelector<HTMLButtonElement>('#mute')!;
 const showMute = () => {
-  for (const button of document.querySelectorAll<HTMLButtonElement>('#mute, #sound')) {
-    button.textContent = isMuted() ? 'Sound: off (M)' : 'Sound: on (M)';
-    button.setAttribute('aria-pressed', String(isMuted()));
-  }
+  muteButton.textContent = isMuted() ? 'Sound: off (M)' : 'Sound: on (M)';
+  muteButton.setAttribute('aria-pressed', String(isMuted()));
 };
 const toggleMute = () => {
   setMuted(!isMuted());
   showMute();
 };
-document.querySelector<HTMLButtonElement>('#mute')!.onclick = toggleMute;
+muteButton.onclick = toggleMute;
 addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement || e.key.toLowerCase() !== 'm') return;
   toggleMute();
@@ -149,6 +147,7 @@ fetch('/api/health')
   .then((text) => (status.textContent = text));
 
 let seat: Player = 0;
+let inGame = false;
 
 // Taunts: speech bubbles over the speaker's head for 2.5 s (yours shows above your cards).
 const bubbles: { el: HTMLElement; seat: number; until: number }[] = [];
@@ -214,7 +213,8 @@ const ui = startLobbyUi(document.querySelector('#lobby')!, {
     players.setSeat(seat);
   },
   onGame: (view) => {
-    phone.setUp(false);
+    if (!inGame) phone.setUp(false); // the first update of a game puts the phone away
+    inGame = true;
     board.setPositions(view.marbles);
     players.setCards(view);
     controls.setState(view.marbles, seat, view.plays);
@@ -225,12 +225,38 @@ const ui = startLobbyUi(document.querySelector('#lobby')!, {
 });
 sendPlay = ui.play;
 sendTaunt = ui.taunt;
-document.querySelector<HTMLButtonElement>('#sound')!.onclick = toggleMute;
 showMute();
+
+// Settings on the phone: three volume sliders and the graphics level (applied by reloading).
+for (const channel of ['master', 'effects', 'taunts'] satisfies Channel[]) {
+  const slider = document.querySelector<HTMLInputElement>(`#volume-${channel}`)!;
+  slider.value = String(Math.round(getVolume(channel) * 100));
+  slider.oninput = () => setVolume(channel, Number(slider.value) / 100);
+}
+const graphics = document.querySelector<HTMLButtonElement>('#graphics')!;
+graphics.textContent = `Graphics: ${quality[0]!.toUpperCase()}${quality.slice(1)}`;
+graphics.onclick = () => {
+  setQuality(QUALITIES[(QUALITIES.indexOf(quality) + 1) % QUALITIES.length]!);
+  const url = new URL(location.href);
+  url.searchParams.delete('q');
+  location.replace(url);
+};
+
+// In a game, Esc (or Back to the game) raises and lowers the phone as a pause menu.
+document.querySelector<HTMLButtonElement>('#resume')!.onclick = () => phone.setUp(false);
+addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || e.defaultPrevented || !inGame) return;
+  if (phone.isUp) phone.setUp(false);
+  else {
+    phone.setUp(true);
+    ui.menu();
+  }
+});
 
 if (params.has('demo')) {
   const auto = params.get('demo') === 'auto';
   phone.setUp(false);
+  inGame = true;
   let game: Game = newGame(Math.random);
   const show = () => {
     board.setPositions(game.marbles);

@@ -56,7 +56,8 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/scene/quality.ts` | Graphics presets Low/Medium/High (`PRESETS`: pixel ratio cap, shadow map size, bloom, MSAA). `getQuality()` reads localStorage `graphics`; `?q=low` overrides for testing |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (claims a free code in its Durable Object), `GET /api/rooms/:code` (exists/full/started), `/api/rooms/:code/ws` (WebSocket). `Room` Durable Object: hibernating WebSockets, lobby saved in storage under `lobby`, empty rooms deleted by an alarm after 1 hour |
 | `src/domain/lobby.ts` | Lobby rules: join (name 1-14 letters), sit (pick seat/team), leave (host passes on), start (host only), `lobbyView` (no private ids) |
-| `src/lobby/ui.ts` | Menu and lobby as a visually hidden HTML form (screens `home`, `entry`, `settings`, `room`; rows marked `data-row`), plus networking: join/create, seats, start, auto-reconnect, turn bar and rematch (`#game` in `index.html`) |
+| `src/lobby/rules.ts` | The 8 How to play pages (tested: short enough, no long dashes) |
+| `src/lobby/ui.ts` | Menu and lobby as a visually hidden HTML form (screens `home`, `entry`, `settings`, `rules`, `room`; rows marked `data-row`), plus networking: join/create, seats, start, auto-reconnect, turn bar and rematch (`#game` in `index.html`) |
 | `src/scene/phone.ts` | The phone menu: low-poly phone in your left hand on the camera, tea in your right hand (sips every 8 s). Its screen canvas (104x180, about 1:1 with the 240 px render) draws the form's visible `data-row` elements; clicks raycast to the screen and go to the real element; arrow keys move focus. `setUp(false)` lowers it when the game starts and `shown` drives your cards rising (`players.ownDrop`) |
 | `src/debug/board2d.ts` | 2D board drawing and `describePlay`, shared by the debug page and the temporary online table |
 | `wrangler.jsonc` | Worker config: static assets, SPA fallback for room links, `ROOMS` Durable Object binding |
@@ -112,8 +113,8 @@ browser and take a screenshot.
 | G3 | Room and table detail: smoother table, cushions, arches, chandelier, sharper procedural textures | M | ✅ done |
 | G4 | Board, marbles and phone: carved board, deeper grooves, round glossy marbles, proper phone model | M | ✅ done |
 | G5 | Characters: smoother faceless heads, hair, beards, shemagh folds, hands with fingers holding cards, phone and tea | M | ✅ done |
-| M15 | Settings (Master/Effects/Taunts volume, Graphics Low/Med/High), How to play pages on the phone, Esc raises the phone in game | M | next |
-| M16 | Logo (full + small icon), favicon, share image | S | |
+| M15 | Settings (Master/Effects/Taunts volume, Graphics Low/Med/High), How to play pages on the phone, Esc raises the phone in game | M | ✅ done |
+| M16 | Logo (full + small icon), favicon, share image | S | next |
 | M17 | Deploy to Cloudflare with domain, release 0.1.0 | S | |
 
 ## Usage log
@@ -134,7 +135,8 @@ browser and take a screenshot.
 | M12 | M | 36% | 38% |
 | M13 | S | 38% | 40% |
 | M14 | M | 40% | 46% (many screenshots) |
-| G1-G5 | 5 x M | 46% | ? (ask at the start of the next session) |
+| G1-G5 | 5 x M | 46% | 58% |
+| M15 | M | 58% | ? (ask at the start of the next session) |
 
 ## Current state
 
@@ -144,7 +146,8 @@ browser and take a screenshot.
 - **G3:** textures are drawn at 4x (`RES` in `textures.ts`) with `mottle` blotches and `weave` threads, and double as bump maps (`lambert(map, color, bump)` in `majlis.ts`). Cushions use three's `RoundedBoxGeometry`, bolsters are capsules, niches have extruded carved frames, the table is a lathe-turned top with turned legs, the chandelier has S-curved tube arms, wax candles and flames.
 - **G4:** the board face is drawn at 2048 px, and `boardTexture(true)` draws a matching height map (grooves deep, numbers and ring engraved, star inlay raised) used as `bumpMap`. Edge is a lathe with a rounded lip. Marbles are `MeshPhysicalMaterial` with clearcoat and a swirl texture (`marbleTexture`, offset per marble). The phone is a rounded body with a metal band and speaker slot.
 - **G5:** see the `players.ts` row. The phone hand holds the bottom left corner with fingers behind; the tea hand holds the istikana from the side (Euler order `ZYX` so fingers point away and curl round the glass).
-- **Next:** M15 (settings, How to play pages, Esc raises the phone in game). Graphics setting = `quality.ts` presets; changing it can simply save and reload the page. Volume = master gain plus separate effects and taunts gain nodes in `sound.ts`.
+- **M15:** Home has How to play (8 pages on the phone, `para` rows wrap text, Next/Back, Esc back home) and Settings: Master/Effects/Taunts sliders (`range` rows: click, drag or arrow keys; `sound.ts` has master + effects + taunts gain nodes, saved as `volume:<channel>`), Graphics Low/Medium/High (saves `graphics` and reloads). In a game, Esc raises the phone as a pause menu (Play and Chaos hidden, Back to the game shown); Esc on the home screen lowers it. Clicks on the raised phone never reach the board. Bloom threshold is 1, so only lights glow.
+- **Next:** M16 logo, favicon, share image; then M17 deploy with a domain and release 0.1.0 (ask the user which domain, and before deploying).
 - **Waiting on the user's feedback:** the look of the majlis (M8), neighbours' heads cut off at the screen edges (M10), how the sounds sound (M12), taunt wording (M13), the new graphics G1-G5 (run it on a real browser and check fps on Low/Medium/High: `?q=low`).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.

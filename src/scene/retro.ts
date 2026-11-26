@@ -69,7 +69,7 @@ export class Retro {
     this.composer = new EffectComposer(renderer, target);
     this.composer.addPass(new RenderPass(scene, camera));
     if (preset.bloom) {
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.5, 0.8);
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.5, 1); // only lights (brighter than white) glow
       this.composer.addPass(this.bloom);
     }
     this.composer.addPass(new OutputPass()); // tone mapping and sRGB, before the CRT touches
