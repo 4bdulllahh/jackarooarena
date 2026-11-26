@@ -12,7 +12,7 @@ interface LobbyView {
   started: boolean;
 }
 
-interface GameView {
+export interface GameView {
   marbles: number[];
   hand: number[];
   handSizes: number[];
@@ -27,7 +27,14 @@ interface GameView {
 const TEAM = ['Team A', 'Team B', 'Team A', 'Team B'];
 const COLOR = ['red', 'blue', 'yellow', 'green'];
 
-export function startLobbyUi(root: HTMLElement): void {
+export interface TableHooks {
+  /** Your seat once you have one (0-3). */
+  onSeat(seat: number): void;
+  /** Every game update from the server. */
+  onGame(view: GameView): void;
+}
+
+export function startLobbyUi(root: HTMLElement, hooks: TableHooks): void {
   const codeFromUrl = location.pathname.slice(1).toUpperCase();
   root.innerHTML = `
     <form id="entry">
@@ -85,8 +92,13 @@ export function startLobbyUi(root: HTMLElement): void {
         $('room').hidden = false;
         say('');
       } else if (msg.t === 'error') say(msg.message!);
-      else if (msg.t === 'lobby') renderSeats((lobby = msg));
-      else if (msg.t === 'game') renderGame((game = msg));
+      else if (msg.t === 'lobby') {
+        renderSeats((lobby = msg));
+        if (msg.you >= 0) hooks.onSeat(msg.you);
+      } else if (msg.t === 'game') {
+        renderGame((game = msg));
+        hooks.onGame(msg);
+      }
     };
   }
 
