@@ -1,6 +1,7 @@
 // The round wooden Jackaroo board on the table, and the marbles that hop from groove to groove.
 // Grooves are painted into one texture (cheap), and marbles sit sunk into them.
 import * as THREE from 'three';
+import { blobTexture } from './textures';
 import { BASE, HOME, type Player, TRACK, entranceOf, ownerOf, startOf } from '../domain/board';
 import { TABLE_HEIGHT } from './majlis';
 
@@ -150,9 +151,10 @@ export class Board {
   /** Called the moment a killed marble is knocked off (when the killer lands). */
   onKill: () => void = () => {};
 
-  constructor() {
-    const wood = new THREE.MeshLambertMaterial({ color: '#4a2c18' });
-    const top = new THREE.MeshLambertMaterial({ map: boardTexture() });
+  /** `blobs`: soft fake shadows under the marbles, for Low graphics where real shadows are off. */
+  constructor(blobs: boolean) {
+    const wood = new THREE.MeshStandardMaterial({ color: '#4a2c18', roughness: 0.6 });
+    const top = new THREE.MeshStandardMaterial({ map: boardTexture(), roughness: 0.55 });
     const body = new THREE.Mesh(
       new THREE.CylinderGeometry(BOARD_RADIUS, BOARD_RADIUS * 0.98, THICKNESS, 32, 1, true),
       wood,
@@ -164,9 +166,19 @@ export class Board {
     this.group.add(body, face);
 
     const geometry = new THREE.SphereGeometry(MARBLE, 10, 8);
+    const blob = new THREE.MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false });
+    const blobGeometry = new THREE.PlaneGeometry(MARBLE * 3.2, MARBLE * 3.2).rotateX(-Math.PI / 2);
     for (let m = 0; m < 16; m++) {
-      const material = new THREE.MeshPhongMaterial({ color: PLAYER_COLORS[ownerOf(m)], shininess: 80 });
+      const material = new THREE.MeshStandardMaterial({
+        color: PLAYER_COLORS[ownerOf(m)],
+        roughness: 0.12, // glassy: the room shows in it through the environment map
+      });
       const mesh = new THREE.Mesh(geometry, material);
+      if (blobs) {
+        const shadow = new THREE.Mesh(blobGeometry, blob);
+        shadow.position.y = -MARBLE + 0.001;
+        mesh.add(shadow);
+      }
       mesh.position.copy(toWorld(holeAt(BASE, m)));
       mesh.userData.marble = m;
       this.marbles.push(mesh);

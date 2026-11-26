@@ -5,7 +5,7 @@ import { type Game, type Play, applyPlay, legalPlays, newGame } from './domain/g
 import { startLobbyUi } from './lobby/ui';
 import { BOARD_TOP, Board } from './scene/board';
 import { Controls } from './scene/controls';
-import { buildMajlis } from './scene/majlis';
+import { buildMajlis, setShadows } from './scene/majlis';
 import { Phone } from './scene/phone';
 import { Players } from './scene/players';
 import { PRESETS, getQuality } from './scene/quality';
@@ -26,12 +26,19 @@ const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 30);
 const rig = new THREE.Group(); // turns to face the board from your seat
 rig.add(camera);
 
-const majlis = buildMajlis();
-const board = new Board();
+const preset = PRESETS[quality];
+const majlis = buildMajlis(preset);
+const board = new Board(!preset.shadows);
 const players = new Players(camera);
 const phone = new Phone(camera, canvas, document.querySelector('#lobby')!);
 scene.add(majlis.group, board.group, players.group, rig);
-const retro = new Retro(renderer, scene, camera, PRESETS[quality]);
+const retro = new Retro(renderer, scene, camera, preset);
+if (preset.shadows) setShadows(scene);
+// Reflections: the room itself, rendered once from above the table, shows in shiny things.
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(scene, 0.04, 0.1, 20, {
+  position: new THREE.Vector3(0, 1.2, 0),
+}).texture;
+scene.environmentIntensity = 0.45;
 
 board.onLand = (_marble, final) => (final ? sounds.drop() : sounds.tick());
 board.onKill = () => sounds.clack();

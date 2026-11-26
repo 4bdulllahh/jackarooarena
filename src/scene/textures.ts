@@ -143,3 +143,13 @@ export const brass = () =>
     g.fillRect(0, 0, 32, 32);
     grain(g, rnd, 32, 200, 0.2);
   });
+
+/** A soft dark spot, for fake contact shadows. */
+export const blobTexture = () =>
+  make(64, (g) => {
+    const shade = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    shade.addColorStop(0, 'rgba(0,0,0,0.55)');
+    shade.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = shade;
+    g.fillRect(0, 0, 64, 64);
+  });

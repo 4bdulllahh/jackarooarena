@@ -7,7 +7,7 @@ const SEAT_RADIUS = 1.25;
 const OWN_Y = -0.25; // camera space: your cards sit low in your view so the board stays clear
 const OTHER_Y = 0.6;
 
-const lambert = (color: string) => new THREE.MeshLambertMaterial({ color });
+const lambert = (color: string) => new THREE.MeshStandardMaterial({ color, roughness: 0.75 });
 
 interface Look {
   skin: string;
@@ -48,7 +48,7 @@ function head(look: Look): THREE.Group {
   skin.scale.set(1, 1.15, 1);
   group.add(skin);
 
-  const top = look.shemagh ? new THREE.MeshLambertMaterial({ map: shemaghTexture() }) : lambert(look.hair);
+  const top = look.shemagh ? new THREE.MeshStandardMaterial({ map: shemaghTexture() }) : lambert(look.hair);
   const cap = new THREE.Mesh(new THREE.SphereGeometry(0.118, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2.2), top);
   cap.scale.set(1, 1.15, 1);
   cap.position.y = 0.01;
@@ -87,7 +87,7 @@ function head(look: Look): THREE.Group {
   } else {
     const stubble = new THREE.Mesh(
       new THREE.SphereGeometry(0.112, 8, 4, Math.PI * 0.15, Math.PI * 0.7, Math.PI * 0.55, Math.PI * 0.35),
-      new THREE.MeshLambertMaterial({ color: look.hair, transparent: true, opacity: 0.55 }),
+      new THREE.MeshStandardMaterial({ color: look.hair, transparent: true, opacity: 0.55 }),
     );
     stubble.rotation.y = Math.PI / 2;
     stubble.scale.set(1, 1.15, 1);
@@ -154,7 +154,7 @@ function fan(cards: (Card | 'back')[]): THREE.Group {
     const t = cards.length === 1 ? 0 : i / (cards.length - 1) - 0.5;
     const mesh = new THREE.Mesh(
       CARD_GEOMETRY,
-      new THREE.MeshLambertMaterial({ map: cardTexture(card), side: THREE.DoubleSide }),
+      new THREE.MeshStandardMaterial({ map: cardTexture(card), side: THREE.DoubleSide }),
     );
     mesh.position.set(t * spread * Math.min(1, cards.length / 4), -Math.abs(t) * 0.02, i * 0.002);
     mesh.userData = { card, baseY: mesh.position.y };
@@ -167,7 +167,12 @@ function fan(cards: (Card | 'back')[]): THREE.Group {
 /** Tea, sunflower seeds, chips and water on a brass tray. */
 function snackTray(): THREE.Group {
   const tray = new THREE.Group();
-  tray.add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.19, 0.015, 16), lambert('#b8862f')));
+  tray.add(
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 0.19, 0.015, 24),
+      new THREE.MeshStandardMaterial({ color: '#b8862f', metalness: 0.85, roughness: 0.35 }),
+    ),
+  );
   const at = (mesh: THREE.Object3D, x: number, y: number, z: number) => {
     mesh.position.set(x, y, z);
     tray.add(mesh);
@@ -184,7 +189,7 @@ function snackTray(): THREE.Group {
       [new THREE.Vector2(0.016, 0), new THREE.Vector2(0.012, 0.03), new THREE.Vector2(0.019, 0.06)],
       8,
     ),
-    new THREE.MeshLambertMaterial({ color: '#b5501c', transparent: true, opacity: 0.85 }),
+    new THREE.MeshStandardMaterial({ color: '#b5501c', transparent: true, opacity: 0.85, roughness: 0.1 }),
   );
   at(glass, -0.08, 0.014, 0.05);
   // Bowls of seeds and chips.
@@ -206,7 +211,7 @@ function snackTray(): THREE.Group {
   at(
     new THREE.Mesh(
       new THREE.CylinderGeometry(0.025, 0.025, 0.16, 8),
-      new THREE.MeshLambertMaterial({ color: '#9fd0e8', transparent: true, opacity: 0.6 }),
+      new THREE.MeshStandardMaterial({ color: '#9fd0e8', transparent: true, opacity: 0.6, roughness: 0.1 }),
     ),
     -0.11,
     0.09,
