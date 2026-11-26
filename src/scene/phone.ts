@@ -7,8 +7,9 @@ import * as THREE from 'three';
 import { PLAYER_COLORS } from './board';
 import { LOOKS, hand } from './players';
 
-// Screen canvas, about 1:1 with the 240 px render height so the text stays readable.
+// Screen layout units; the canvas is drawn at RES times that so text stays sharp at full resolution.
 export const SCREEN = { w: 104, h: 180 };
+const RES = 4;
 const SCREEN_W = 0.064;
 const SCREEN_H = (SCREEN_W * SCREEN.h) / SCREEN.w;
 const TOP = 15; // below the status bar
@@ -57,11 +58,9 @@ export class Phone {
     private view: HTMLCanvasElement,
     private root: HTMLElement,
   ) {
-    this.canvas.width = SCREEN.w;
-    this.canvas.height = SCREEN.h;
-    this.texture.magFilter = THREE.NearestFilter;
-    this.texture.minFilter = THREE.LinearFilter;
-    this.texture.generateMipmaps = false;
+    this.canvas.width = SCREEN.w * RES;
+    this.canvas.height = SCREEN.h * RES;
+    this.texture.anisotropy = 4;
     this.texture.colorSpace = THREE.SRGBColorSpace;
 
     const skin = LOOKS[0]!.skin;
@@ -191,6 +190,7 @@ export class Phone {
   private draw(caret: boolean): void {
     this.dirty = false;
     const g = this.g;
+    g.setTransform(RES, 0, 0, RES, 0, 0);
     const { w, h } = SCREEN;
     g.fillStyle = '#1d130d';
     g.fillRect(0, 0, w, h);

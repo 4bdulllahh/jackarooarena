@@ -35,7 +35,6 @@ function shemaghTexture(): THREE.CanvasTexture {
     g.fillRect(0, i, 32, 1);
   }
   const tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.NearestFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(3, 2);
@@ -115,9 +114,10 @@ function cardTexture(card: Card | 'back'): THREE.CanvasTexture {
   const cached = cardTextures.get(card);
   if (cached) return cached;
   const canvas = document.createElement('canvas');
-  canvas.width = 48;
-  canvas.height = 64;
+  canvas.width = 48 * 4;
+  canvas.height = 64 * 4;
   const g = canvas.getContext('2d')!;
+  g.scale(4, 4); // drawn in 48 x 64 units, 4x sharper
   g.fillStyle = '#f4ead6';
   g.fillRect(0, 0, 48, 64);
   if (card === 'back') {
@@ -138,7 +138,7 @@ function cardTexture(card: Card | 'back'): THREE.CanvasTexture {
     g.fillText(name.slice(-1), 24, 38);
   }
   const tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.NearestFilter;
+  tex.anisotropy = 4;
   tex.colorSpace = THREE.SRGBColorSpace;
   cardTextures.set(card, tex);
   return tex;

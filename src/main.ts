@@ -8,14 +8,15 @@ import { Controls } from './scene/controls';
 import { buildMajlis } from './scene/majlis';
 import { Phone } from './scene/phone';
 import { Players } from './scene/players';
-import { Retro, snapVertices } from './scene/retro';
+import { PRESETS, getQuality } from './scene/quality';
+import { Retro } from './scene/retro';
 import { isMuted, setMuted, sounds } from './scene/sound';
 import { TAUNTS, type TauntId, killed, tauntLabel } from './domain/taunts';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
-// antialias off: the low-res pixel look is the point, and it's cheaper on weak PCs.
+// antialias off on the canvas: the post-processing target does its own MSAA on Medium and High.
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-const retro = new Retro(renderer);
+const quality = getQuality();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#1a0f08');
@@ -30,7 +31,7 @@ const board = new Board();
 const players = new Players(camera);
 const phone = new Phone(camera, canvas, document.querySelector('#lobby')!);
 scene.add(majlis.group, board.group, players.group, rig);
-snapVertices(scene);
+const retro = new Retro(renderer, scene, camera, PRESETS[quality]);
 
 board.onLand = (_marble, final) => (final ? sounds.drop() : sounds.tick());
 board.onKill = () => sounds.clack();
@@ -83,6 +84,23 @@ addEventListener('keydown', (e) => {
   sounds.whoosh();
 });
 
+// Development only: frames per second and the graphics setting, top left.
+const fps = import.meta.env.DEV ? fpsMeter() : null;
+function fpsMeter() {
+  const el = document.createElement('p');
+  el.id = 'fps';
+  document.body.append(el);
+  let frames = 0;
+  let since = 0;
+  return (t: number) => {
+    frames++;
+    if (t - since < 500) return;
+    el.textContent = `${Math.round((frames * 1000) / (t - since))} fps, ${quality}`;
+    frames = 0;
+    since = t;
+  };
+}
+
 function resize() {
   retro.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
@@ -113,7 +131,8 @@ renderer.setAnimationLoop((t) => {
   players.ownDrop = phone.shown * 0.4;
   players.update(t, turn);
   placeBubbles(t);
-  retro.render(scene, camera);
+  retro.render(t);
+  fps?.(t);
 });
 
 const status = document.querySelector('#status')!;

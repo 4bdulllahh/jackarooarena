@@ -104,7 +104,7 @@ function boardTexture(): THREE.CanvasTexture {
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = THREE.NearestFilter;
+  tex.anisotropy = 4;
   return tex;
 }
 

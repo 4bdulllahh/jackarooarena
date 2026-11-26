@@ -52,7 +52,8 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/domain/taunts.ts` | The 6 preset taunts (`TAUNTS`, `isTaunt`, `tauntLabel`) and `killed(before, after)` used for bot gloating |
 | `tools/shot.mjs` | Browser check: `node tools/shot.mjs <url> <out-dir> wait:<ms> key:<Key> click:<x>,<y> shot:<name> text:<selector>` drives the installed Edge (playwright-core) and reports page errors |
 | `src/scene/textures.ts` | Procedural canvas textures (plaster, wood, carpet, Sadu weave, frieze, brass), small and nearest-filtered |
-| `src/scene/retro.ts` | PS1/CRT look: renders at 240 px tall, upscales with 15-bit colour, dithering, vignette, scanlines; `snapVertices` adds the PS1 vertex wobble to every material |
+| `src/scene/retro.ts` | Render pipeline (three's EffectComposer): full-res render with MSAA, ACES tone mapping, bloom on Medium/High, then a soft CRT pass (faint scanlines, fine dither, grain, edge colour fringing, vignette) |
+| `src/scene/quality.ts` | Graphics presets Low/Medium/High (`PRESETS`: pixel ratio cap, shadow map size, bloom, MSAA). `getQuality()` reads localStorage `graphics`; `?q=low` overrides for testing |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (claims a free code in its Durable Object), `GET /api/rooms/:code` (exists/full/started), `/api/rooms/:code/ws` (WebSocket). `Room` Durable Object: hibernating WebSockets, lobby saved in storage under `lobby`, empty rooms deleted by an alarm after 1 hour |
 | `src/domain/lobby.ts` | Lobby rules: join (name 1-14 letters), sit (pick seat/team), leave (host passes on), start (host only), `lobbyView` (no private ids) |
 | `src/lobby/ui.ts` | Menu and lobby as a visually hidden HTML form (screens `home`, `entry`, `settings`, `room`; rows marked `data-row`), plus networking: join/create, seats, start, auto-reconnect, turn bar and rematch (`#game` in `index.html`) |
@@ -106,7 +107,12 @@ browser and take a screenshot.
 | M12 | Procedural sound, mute toggle | M | ✅ done |
 | M13 | Taunts / quick emotes with sounds | S | ✅ done |
 | M14 | Phone menu: phone left hand, tea right, Play / Chaos (soon) / Settings, name, room code | M | ✅ done |
-| M15 | How to play screen + settings (volume sliders, graphics low/high) | M | next |
+| G1 | Render pipeline: full resolution, softer CRT filter, no vertex wobble, Low/Med/High presets, sharp phone and cards, dev fps meter | M | ✅ done |
+| G2 | Lighting: chandelier shadows (Med/High), blob shadows (Low), bloom glow, lanterns/candles, better materials (shiny marbles, brass, glass) | M | next |
+| G3 | Room and table detail: smoother table, cushions, arches, chandelier, sharper procedural textures | M | |
+| G4 | Board, marbles and phone: carved board, deeper grooves, round glossy marbles, proper phone model | M | |
+| G5 | Characters: smoother faceless heads, hair, beards, shemagh folds, hands with fingers holding cards, phone and tea | M | |
+| M15 | Settings (Master/Effects/Taunts volume, Graphics Low/Med/High), How to play pages on the phone, Esc raises the phone in game | M | |
 | M16 | Logo (full + small icon), favicon, share image | S | |
 | M17 | Deploy to Cloudflare with domain, release 0.1.0 | S | |
 
@@ -127,12 +133,14 @@ browser and take a screenshot.
 | M11 | M | 29% | 36% (many screenshots: keep image checks few) |
 | M12 | M | 36% | 38% |
 | M13 | S | 38% | 40% |
-| M14 | M | 40% | ? (ask at the start of the next session) |
+| M14 | M | 40% | 46% (many screenshots) |
+| G1-G5 | 5 x M | 46% | ? (ask at the start of the next session) |
 
 ## Current state
 
-- **Last done:** M14. The menu is a phone in your left hand (tea in the right, a sip every 8 s): JackarooArena title, Play (name, room code, Join, Create, Back), Chaos (coming soon, greyed), Settings (sound toggle, Back), then the room screen (copy link, 4 seats with colour squares, Start or "Waiting for the host"). The real controls are a hidden HTML form, so Tab/Enter, arrow keys and screen readers work; clicks on the phone screen go to them. A room link opens on Play with the code filled in. When the game starts the phone drops out of view and your cards come up; the turn bar and Rematch are now a small HUD at the top. `V` is ignored while the phone is up. Checked in Edge: click and keyboard flows, room created, game started, no page errors.
-- **Next:** M15. Settings screen gets volume sliders and graphics low/high (the phone draws `data-row` rows: sliders need a new row kind in `phone.ts` `draw`, or use buttons like "Volume: 70% -/+"), plus a How to play screen (new section in `ui.ts` and a button on `home`). Maybe allow raising the phone in game (Esc) to reach Settings.
+- **Graphics overhaul (decided after M14):** the user found the 240-line look too pixelated: "the vibes, not the actual super low res". Decisions: render at full screen resolution with the CRT filter on at every level (Low/Med/High change shadows, bloom, MSAA, pixel ratio cap, not pixels); real shadows + warm glow, blob shadows on Low; no vertex wobble; more polys, things should look nice; characters stay faceless but detailed; 60 fps. Then M15: volume sliders Master + Effects + Taunts, How to play as pages on the phone, Esc raises the phone in game. The user asked for G1-G5 in one go, pushing after each.
+- **Last done:** G1. New pipeline in `retro.ts` + `quality.ts`, vertex wobble removed, textures linear-filtered, phone screen and cards drawn at 4x. Dev fps meter top left (headless Edge uses a software renderer, so its fps means nothing; check on a real browser).
+- **Next:** the next G milestone in the table.
 - **Waiting on the user's feedback:** the look of the majlis (M8), neighbours' heads cut off at the screen edges (M10), how the sounds sound (M12), taunt wording (M13), the phone hands (low-poly mittens, they read as blocks up close) (M14).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.

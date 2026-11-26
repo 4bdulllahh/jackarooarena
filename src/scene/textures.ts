@@ -1,4 +1,4 @@
-// Procedural textures drawn on small canvases. Small sizes + nearest filtering = the PS1 look.
+// Procedural textures drawn on canvases, so there is no art to download or license.
 import * as THREE from 'three';
 
 /** Repeatable noise so the room looks the same on every load. */
@@ -12,9 +12,7 @@ function make(size: number, draw: (g: CanvasRenderingContext2D, rnd: () => numbe
   const g = canvas.getContext('2d')!;
   draw(g, seeded(seed));
   const tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.generateMipmaps = false;
+  tex.anisotropy = 4;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
