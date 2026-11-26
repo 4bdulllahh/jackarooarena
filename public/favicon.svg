@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The logo's icon: a screaming mouth and the red marble. Made to read at 16 px. -->
+  <defs>
+    <radialGradient id="m" cx="35%" cy="30%" r="70%">
+      <stop offset="0" stop-color="#ff8a7a"/>
+      <stop offset="0.45" stop-color="#d63a3a"/>
+      <stop offset="1" stop-color="#6e1010"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#c68a5e"/>
+  <ellipse cx="29" cy="31" rx="23" ry="22" fill="#5a0d10" stroke="#8a3a2a" stroke-width="5"/>
+  <path d="M14 46 Q29 34 44 46 Q29 54 14 46 Z" fill="#d9636b"/>
+  <g fill="#f8f1e2" stroke="#2a1206" stroke-width="1.2">
+    <rect x="15" y="11" width="8" height="9" rx="1.5"/>
+    <rect x="24" y="9.5" width="8" height="10" rx="1.5"/>
+    <rect x="33" y="10.5" width="8" height="9" rx="1.5"/>
+  </g>
+  <circle cx="47" cy="45" r="12" fill="url(#m)" stroke="#2a1206" stroke-width="2.5"/>
+  <circle cx="43" cy="41" r="3.5" fill="#fff" opacity="0.85"/>
+</svg>

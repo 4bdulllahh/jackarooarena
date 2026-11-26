@@ -62,6 +62,7 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/debug/board2d.ts` | 2D board drawing and `describePlay`, shared by the debug page and the temporary online table |
 | `wrangler.jsonc` | Worker config: static assets, SPA fallback for room links, `ROOMS` Durable Object binding |
 | `docs/reference/` | Board layout, groove look, logo meme references |
+| `public/` | `logo.svg` (square meme logo: the screaming shemagh player holds up the killed marble, the calm bearded one smirks with his cards), `favicon.svg` (mouth + marble), PNGs and `og.png` share image made by `node tools/assets.mjs` (renders the SVGs in Edge) |
 
 ## Data and storage
 
@@ -114,8 +115,8 @@ browser and take a screenshot.
 | G4 | Board, marbles and phone: carved board, deeper grooves, round glossy marbles, proper phone model | M | ✅ done |
 | G5 | Characters: smoother faceless heads, hair, beards, shemagh folds, hands with fingers holding cards, phone and tea | M | ✅ done |
 | M15 | Settings (Master/Effects/Taunts volume, Graphics Low/Med/High), How to play pages on the phone, Esc raises the phone in game | M | ✅ done |
-| M16 | Logo (full + small icon), favicon, share image | S | next |
-| M17 | Deploy to Cloudflare with domain, release 0.1.0 | S | |
+| M16 | Logo (full + small icon), favicon, share image | S | ✅ done |
+| M17 | Deploy to Cloudflare with domain, release 0.1.0 | S | next |
 
 ## Usage log
 
@@ -147,8 +148,9 @@ browser and take a screenshot.
 - **G4:** the board face is drawn at 2048 px, and `boardTexture(true)` draws a matching height map (grooves deep, numbers and ring engraved, star inlay raised) used as `bumpMap`. Edge is a lathe with a rounded lip. Marbles are `MeshPhysicalMaterial` with clearcoat and a swirl texture (`marbleTexture`, offset per marble). The phone is a rounded body with a metal band and speaker slot.
 - **G5:** see the `players.ts` row. The phone hand holds the bottom left corner with fingers behind; the tea hand holds the istikana from the side (Euler order `ZYX` so fingers point away and curl round the glass).
 - **M15:** Home has How to play (8 pages on the phone, `para` rows wrap text, Next/Back, Esc back home) and Settings: Master/Effects/Taunts sliders (`range` rows: click, drag or arrow keys; `sound.ts` has master + effects + taunts gain nodes, saved as `volume:<channel>`), Graphics Low/Medium/High (saves `graphics` and reloads). In a game, Esc raises the phone as a pause menu (Play and Chaos hidden, Back to the game shown); Esc on the home screen lowers it. Clicks on the raised phone never reach the board. Bloom threshold is 1, so only lights glow.
-- **Next:** M16 logo, favicon, share image; then M17 deploy with a domain and release 0.1.0 (ask the user which domain, and before deploying).
-- **Waiting on the user's feedback:** the look of the majlis (M8), neighbours' heads cut off at the screen edges (M10), how the sounds sound (M12), taunt wording (M13), the new graphics G1-G5 (run it on a real browser and check fps on Low/Medium/High: `?q=low`).
+- **M16:** logo, favicon and share image in `public/`, linked from `index.html` (description, theme colour, Open Graph and Twitter tags). `og:image` is relative until the domain is known.
+- **Next:** M17: ask the user for the domain, make `og:image` absolute, release notes, README, version tag, then deploy only after the user says yes.
+- **Waiting on the user's feedback:** the look of the majlis (M8), neighbours' heads cut off at the screen edges (M10), how the sounds sound (M12), taunt wording (M13), the logo (M16), the new graphics G1-G5 (run it on a real browser and check fps on Low/Medium/High: `?q=low`).
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** nothing. Everything up to M13 is on GitHub.
