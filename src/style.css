@@ -25,7 +25,9 @@ body {
   position: fixed;
   top: 1rem;
   left: 1rem;
-  max-width: 24rem;
+  max-width: 32rem;
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
   padding: 1rem;
   background: #1a0f08dd;
   border-radius: 0.5rem;
@@ -34,4 +36,19 @@ body {
 #lobby label {
   display: block;
   margin-bottom: 0.5rem;
+}
+
+#board {
+  width: min(90vw, 480px);
+  height: auto;
+  background: #6b4423;
+  border-radius: 50%;
+}
+
+#plays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  max-height: 30vh;
+  overflow: auto;
 }

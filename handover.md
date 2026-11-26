@@ -46,7 +46,8 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/main.ts` | Client entry: three.js scene (placeholder board until M8) |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (claims a free code in its Durable Object), `GET /api/rooms/:code` (exists/full/started), `/api/rooms/:code/ws` (WebSocket). `Room` Durable Object: hibernating WebSockets, lobby saved in storage under `lobby`, empty rooms deleted by an alarm after 1 hour |
 | `src/domain/lobby.ts` | Lobby rules: join (name 1-14 letters), sit (pick seat/team), leave (host passes on), start (host only), `lobbyView` (no private ids) |
-| `src/lobby/ui.ts` | Temporary plain HTML lobby (name, create/join, seats, start, copy link). Replaced by the phone menu in M14 |
+| `src/lobby/ui.ts` | Temporary plain HTML lobby + 2D online table (legal plays as buttons, turn countdown, rematch, auto-reconnect). Replaced by the 3D table (M9-M11) and phone menu (M14) |
+| `src/debug/board2d.ts` | 2D board drawing and `describePlay`, shared by the debug page and the temporary online table |
 | `wrangler.jsonc` | Worker config: static assets, SPA fallback for room links, `ROOMS` Durable Object binding |
 | `docs/reference/` | Board layout, groove look, logo meme references |
 
@@ -57,7 +58,12 @@ In the browser, localStorage keeps `name` and `id:<CODE>` (the private player id
 used to rejoin). Settings will go there too (M15).
 
 WebSocket messages, client to server: `{t:'join', name, id?}`, `{t:'sit', seat}`, `{t:'start'}`.
-Server to client: `{t:'welcome', id}`, `{t:'lobby', seats, hostSeat, you, started}`, `{t:'error', message}`.
+Also `{t:'play', play}` (a play copied from the server's `plays` list) and `{t:'rematch'}` (host, after a win).
+Server to client: `{t:'welcome', id}`, `{t:'lobby', seats, hostSeat, you, started}`, `{t:'error', message}`,
+`{t:'game', ...viewFor(game, seat), bots, deadline, plays}` (only your own hand; `plays` = your legal plays now).
+
+Storage keys in the Room: `lobby` and `match` (`{game, bots, deadline}`). One alarm runs bots
+(0.9 s per move), the 15 s human timeout (a bot plays that turn) and the 1-hour empty-room delete.
 
 ## Rules that must not break
 
@@ -81,8 +87,8 @@ browser and take a screenshot.
 | M4 | Bots: legal moves, prefer kills and sabotage | S | ✅ done |
 | M5 | Flat 2D debug board, play a full game to check rules | S | ✅ done |
 | M6 | Online rooms: create/join by code or link, name, pick seat/team, host starts, bots fill seats | M | ✅ done |
-| M7 | Online play: hidden hands, network moves, reconnect, 15 s turn timer then bot plays, rematch | M | next |
-| M8 | 3D majlis: room, low table, warm light, chandelier, PS1/CRT look | M | |
+| M7 | Online play: hidden hands, network moves, reconnect, 15 s turn timer then bot plays, rematch | M | ✅ done |
+| M8 | 3D majlis: room, low table, warm light, chandelier, PS1/CRT look | M | next |
 | M9 | 3D board: wooden board, grooves, marbles, movement | M | |
 | M10 | Players: floating heads, hands with cards, snack trays | M | |
 | M11 | Cameras (first person / top-down, `V`) + picking cards and marbles + legal move highlights | M | |
@@ -102,12 +108,13 @@ browser and take a screenshot.
 | M3 | M | 13% | 15% |
 | M4 | S | 15% | 16% |
 | M5 | S | 16% | 17% |
-| M6 | M | 17% | ? |
+| M6 | M | 17% | 19% |
+| M7 | M | 19% | ? |
 
 ## Current state
 
-- **Last done:** M6. Rooms work end to end: create, join by code or `/CODE` link, names validated on the server, seat/team picking, host-only start, full and started rooms turn people away, private ids never sent to other players. Tested with a Node WebSocket script against `npm run dev` (create, bad name, non-host start, late join, missing room, id leak) and a screenshot.
-- **Next:** M7 online play. On start, the Room creates the `Game` (`newGame` with `crypto` random) with empty seats as bots, stores it, and sends each socket `viewFor(game, seat)`. New message `{t:'play', play}` checked with `applyPlay` (null = error). Bots and the 15 s turn timer run on the Durable Object alarm (one alarm: next bot move or timeout; on timeout `botPlay` plays for the human). Reconnect: after the start, a dropped player keeps their seat (rejoin with the stored id). Rematch: host sends `{t:'rematch'}` after a win. Update the debug board or add a temporary text view to play online.
+- **Last done:** M7. Online games work: the server deals, keeps every hand private, accepts only legal plays, runs bots, plays for a human after 15 s, keeps your seat when you drop and reconnects you automatically, and the host can start a rematch (next dealer). Tested live with 2 WebSocket clients + 2 bots: private hands, illegal move refused, timeout after 15.2 s, reconnect into seat 0. Rematch was not tested live (needs a finished game).
+- **Next:** M8 3D majlis in `src/scene/`: replace the placeholder in `src/main.ts` with the room (floor cushions, low table, walls with arches/patterns, warm lighting, chandelier), all procedural (canvas textures, low-poly geometry). PS1/CRT look: render to a small render target (about 320x240) with nearest filtering, then upscale; optional vertex snapping and a light scanline/vignette pass. Keep the 2D online table working on top until M9-M11. Check with a headless Edge screenshot. Consider `/impeccable` only for 2D UI, not the 3D scene.
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.

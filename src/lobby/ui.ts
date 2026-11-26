@@ -1,6 +1,9 @@
-// shortcut: plain HTML lobby so rooms can be tested now; M14 moves this onto the in-hand phone menu.
+// shortcut: plain HTML lobby and 2D table so online play can be tested now; M9-M14 replace them.
+import { cardName } from '../domain/cards';
+import type { Play } from '../domain/game';
 import { MAX_NAME } from '../domain/lobby';
 import { isRoomCode } from '../domain/roomCode';
+import { describePlay, drawBoard } from '../debug/board2d';
 
 interface LobbyView {
   seats: ({ name: string; you: boolean } | null)[];
@@ -9,7 +12,20 @@ interface LobbyView {
   started: boolean;
 }
 
+interface GameView {
+  marbles: number[];
+  hand: number[];
+  handSizes: number[];
+  turn: number;
+  pending: { kind: string; by?: number; victim?: number } | null;
+  winner: 0 | 1 | null;
+  lastDiscard: number | null;
+  deadline: number | null;
+  plays: Play[];
+}
+
 const TEAM = ['Team A', 'Team B', 'Team A', 'Team B'];
+const COLOR = ['red', 'blue', 'yellow', 'green'];
 
 export function startLobbyUi(root: HTMLElement): void {
   const codeFromUrl = location.pathname.slice(1).toUpperCase();
@@ -24,7 +40,13 @@ export function startLobbyUi(root: HTMLElement): void {
       <h2>Room <span id="room-code"></span> <button type="button" id="copy">Copy link</button></h2>
       <ol id="seats"></ol>
       <button type="button" id="start" hidden>Start game</button>
-      <p id="started" hidden>Game started. The table comes in the next milestones.</p>
+    </section>
+    <section id="game" hidden>
+      <canvas id="board" width="640" height="640" aria-label="Board"></canvas>
+      <p id="turn" role="status"></p>
+      <p id="hand"></p>
+      <div id="plays"></div>
+      <button type="button" id="rematch" hidden>Rematch</button>
     </section>
     <p id="message" role="alert"></p>`;
 
@@ -36,6 +58,10 @@ export function startLobbyUi(root: HTMLElement): void {
   const say = (text: string) => ($('message').textContent = text);
 
   let socket: WebSocket | null = null;
+  let lobby: LobbyView | null = null;
+  let game: GameView | null = null;
+  const send = (msg: object) => socket?.send(JSON.stringify(msg));
+  const nameOf = (seat: number) => lobby?.seats[seat]?.name ?? `Bot (${COLOR[seat]})`;
 
   function connect(code: string) {
     const name = nameInput.value.trim();
@@ -46,16 +72,21 @@ export function startLobbyUi(root: HTMLElement): void {
     socket = new WebSocket(`${protocol}://${location.host}/api/rooms/${code}/ws`);
     socket.onopen = () =>
       socket!.send(JSON.stringify({ t: 'join', name, id: localStorage.getItem(`id:${code}`) }));
-    socket.onclose = () => say('Disconnected from the room. Refresh to rejoin.');
+    socket.onclose = () => {
+      say('Connection lost. Reconnecting…');
+      setTimeout(() => connect(code), 2000);
+    };
     socket.onmessage = (event) => {
-      const msg = JSON.parse(String(event.data)) as { t: string; id?: string; message?: string } & LobbyView;
+      const msg = JSON.parse(String(event.data)) as { t: string; id?: string; message?: string } & LobbyView &
+        GameView;
       if (msg.t === 'welcome') {
         localStorage.setItem(`id:${code}`, msg.id!);
         $('entry').hidden = true;
         $('room').hidden = false;
         say('');
       } else if (msg.t === 'error') say(msg.message!);
-      else if (msg.t === 'lobby') renderSeats(msg);
+      else if (msg.t === 'lobby') renderSeats((lobby = msg));
+      else if (msg.t === 'game') renderGame((game = msg));
     };
   }
 
@@ -72,21 +103,52 @@ export function startLobbyUi(root: HTMLElement): void {
         if (!seat && !view.started) {
           const sit = document.createElement('button');
           sit.textContent = 'Sit here';
-          sit.onclick = () => socket?.send(JSON.stringify({ t: 'sit', seat: i }));
+          sit.onclick = () => send({ t: 'sit', seat: i });
           li.append(sit);
         }
         return li;
       }),
     );
     $('start').hidden = view.started || view.you !== view.hostSeat;
-    $('started').hidden = !view.started;
   }
+
+  function renderGame(view: GameView) {
+    $('game').hidden = false;
+    drawBoard($<HTMLCanvasElement>('board').getContext('2d')!, view.marbles);
+    $('hand').textContent = `Your cards: ${view.hand.map(cardName).join('  ') || '(none)'}`;
+    $('plays').replaceChildren(
+      ...view.plays.map((play) => {
+        const button = document.createElement('button');
+        button.textContent = describePlay(play);
+        button.onclick = () => send({ t: 'play', play });
+        return button;
+      }),
+    );
+    $('rematch').hidden = view.winner === null || lobby?.you !== lobby?.hostSeat;
+    renderTurn();
+  }
+
+  function renderTurn() {
+    if (!game) return;
+    const last = game.lastDiscard === null ? '' : ` · last card: ${cardName(game.lastDiscard)}`;
+    if (game.winner !== null) {
+      $('turn').textContent =
+        `${game.winner === (lobby?.you ?? 0) % 2 ? 'Your team wins!' : 'The other team wins.'}`;
+      return;
+    }
+    const actor = game.pending?.kind === 'pick' ? game.pending.by! : game.turn;
+    const left = game.deadline ? Math.max(0, Math.ceil((game.deadline - Date.now()) / 1000)) : null;
+    $('turn').textContent =
+      `${actor === lobby?.you ? 'Your turn' : `${nameOf(actor)} is playing`}${left === null ? '' : ` · ${left}s`}${last}`;
+  }
+  setInterval(renderTurn, 500);
 
   async function roomExists(code: string): Promise<boolean> {
     const info = (await (await fetch(`/api/rooms/${code}`)).json()) as { exists?: boolean; full?: boolean };
+    const rejoining = localStorage.getItem(`id:${code}`) !== null;
     if (!info.exists) say('No room with that code.');
-    else if (info.full) say('That room is full.');
-    return Boolean(info.exists && !info.full);
+    else if (info.full && !rejoining) say('That room is full.');
+    return Boolean(info.exists && (!info.full || rejoining));
   }
 
   $('entry').onsubmit = async (event) => {
@@ -102,6 +164,10 @@ export function startLobbyUi(root: HTMLElement): void {
     if (body.code) connect(body.code);
     else say(body.error ?? 'Could not create a room.');
   };
-  $('start').onclick = () => socket?.send(JSON.stringify({ t: 'start' }));
+  $('start').onclick = () => send({ t: 'start' });
+  $('rematch').onclick = () => send({ t: 'rematch' });
+  // Coming back to a room link you were already in: rejoin your seat straight away.
+  if (isRoomCode(codeFromUrl) && nameInput.value && localStorage.getItem(`id:${codeFromUrl}`))
+    void roomExists(codeFromUrl).then((ok) => ok && connect(codeFromUrl));
   $('copy').onclick = () => navigator.clipboard.writeText(location.href).then(() => say('Link copied.'));
 }
