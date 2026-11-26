@@ -4,6 +4,7 @@
 // form's visible rows (elements marked `data-row`), and a click on the screen goes to the row
 // under it.
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { PLAYER_COLORS } from './board';
 import { LOOKS, hand } from './players';
 
@@ -64,10 +65,20 @@ export class Phone {
     this.texture.colorSpace = THREE.SRGBColorSpace;
 
     const skin = LOOKS[0]!.skin;
+    // A rounded black phone with a thin metal band round the edge and a speaker slot.
     const body = new THREE.Mesh(
-      new THREE.BoxGeometry(SCREEN_W + 0.008, SCREEN_H + 0.016, 0.007),
-      new THREE.MeshLambertMaterial({ color: '#16110e' }),
+      new RoundedBoxGeometry(SCREEN_W + 0.007, SCREEN_H + 0.014, 0.007, 4, 0.0032),
+      new THREE.MeshStandardMaterial({ color: '#121012', metalness: 0.5, roughness: 0.35 }),
     );
+    const band = new THREE.Mesh(
+      new RoundedBoxGeometry(SCREEN_W + 0.0076, SCREEN_H + 0.0146, 0.0036, 4, 0.0018),
+      new THREE.MeshStandardMaterial({ color: '#8a8580', metalness: 0.9, roughness: 0.3 }),
+    );
+    const slot = new THREE.Mesh(
+      new RoundedBoxGeometry(0.012, 0.0016, 0.0006, 2, 0.0003),
+      new THREE.MeshBasicMaterial({ color: '#000000' }),
+    );
+    slot.position.set(0, SCREEN_H / 2 + 0.0035, 0.0035);
     this.screen = new THREE.Mesh(
       new THREE.PlaneGeometry(SCREEN_W, SCREEN_H),
       new THREE.MeshBasicMaterial({ map: this.texture }), // lit by itself, like a real screen
@@ -78,7 +89,7 @@ export class Phone {
     left.position.set(-SCREEN_W / 2 - 0.006, -SCREEN_H / 2 + 0.02, -0.006);
     left.rotation.z = -0.35;
     const phone = new THREE.Group();
-    phone.add(body, this.screen, left);
+    phone.add(body, band, slot, this.screen, left);
     phone.position.set(-0.02, -0.004, -0.125);
     phone.rotation.set(-0.04, 0.08, 0.02);
 
