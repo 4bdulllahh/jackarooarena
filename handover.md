@@ -48,6 +48,7 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/scene/majlis.ts` | The room: walls with arch niches and star frieze, wood ceiling and beams, carpet, Sadu floor seating along the walls, low round table (`TABLE_HEIGHT` 0.34, `TABLE_RADIUS` 0.8) with 4 player cushions, brass chandelier. 2 lights only (hemisphere + chandelier point light) |
 | `src/scene/players.ts` | `Players`: 4 faceless low-poly heads (hair/shemagh + beard styles), mitten hands holding a card fan (yours face up, others face down by `handSizes`), snack tray per seat (istikana tea, seeds, chips, water). `setSeat`, `setCards`, `update(time, turn)`; the player whose turn it is lifts their cards |
 | `src/scene/controls.ts` | Playing in 3D: click a card (or number keys), movable marbles glow, click a marble, glowing discs mark destinations, click to play; `#choices` panel lists the same options as buttons (keyboard, 7 splits, burns, red Q picks). `landing(marbles, me, play)` = which marble a play moves and where (tested) |
+| `src/scene/sound.ts` | Web Audio sounds made in code: `tick` (marble passing a groove), `drop` (settling), `clack` (kill), `flick` (card), `ping` (your turn), `whoosh` (camera). Starts on the first click/key; `setMuted` saved in localStorage `muted`. Wired in `main.ts` (`board.onLand`, `board.onKill`, hand sizes, `M` key, `#mute` button) |
 | `tools/shot.mjs` | Browser check: `node tools/shot.mjs <url> <out-dir> wait:<ms> key:<Key> click:<x>,<y> shot:<name> text:<selector>` drives the installed Edge (playwright-core) and reports page errors |
 | `src/scene/textures.ts` | Procedural canvas textures (plaster, wood, carpet, Sadu weave, frieze, brass), small and nearest-filtered |
 | `src/scene/retro.ts` | PS1/CRT look: renders at 240 px tall, upscales with 15-bit colour, dithering, vignette, scanlines; `snapVertices` adds the PS1 vertex wobble to every material |
@@ -99,8 +100,8 @@ browser and take a screenshot.
 | M9 | 3D board: wooden board, grooves, marbles, movement | M | ✅ done |
 | M10 | Players: floating heads, hands with cards, snack trays | M | ✅ done |
 | M11 | Cameras (first person / top-down, `V`) + picking cards and marbles + legal move highlights | M | ✅ done |
-| M12 | Procedural sound, mute toggle | M | next |
-| M13 | Taunts / quick emotes with sounds | S | |
+| M12 | Procedural sound, mute toggle | M | ✅ done |
+| M13 | Taunts / quick emotes with sounds | S | next |
 | M14 | Phone menu: phone left hand, tea right, Play / Chaos (soon) / Settings, name, room code | M | |
 | M15 | How to play screen + settings (volume sliders, graphics low/high) | M | |
 | M16 | Logo (full + small icon), favicon, share image | S | |
@@ -120,12 +121,13 @@ browser and take a screenshot.
 | M8 | M | 22% | 24% |
 | M9 | M | 24% | 27% |
 | M10 | M | 27% | 29% |
-| M11 | M | 29% | ? |
+| M11 | M | 29% | 36% (many screenshots: keep image checks few) |
+| M12 | M | 36% | ? |
 
 ## Current state
 
-- **Last done:** M11. `V` toggles seat / top-down view; your cards ride on the camera at the bottom of the screen; play by clicking card, marble, glowing target, or with the `#choices` panel / number keys. Verified in Edge with playwright-core: 3D card clicks select cards, an A played by clicking the start-tile disc, no page errors. The 2D board is gone from the online page (still on `/debug.html`).
-- **Next:** M12 procedural sound in `src/scene/sound.ts` with Web Audio, no files: marble drop into a groove (short wooden "tok" with a resonant body, slight random pitch), clack when marbles hit (kills), card flick (filtered noise burst) when cards are played/dealt, a soft whoosh for the camera toggle, low warm room tone. Hook `board.onLand`, kills (a marble going to `BASE`), `players.setCards` changes, turn start ping for you. Mute toggle (`M` key + button), saved in localStorage. Audio must start after the first click (browser autoplay rules).
+- **Last done:** M12. Procedural sound: grooves tick as a marble hops and it lands with a wooden tok, kills clack when the killer lands, cards flick when played and dealt, a chime on your turn, a whoosh on `V`. Mute with `M` or the top-right button, remembered. Verified in Edge: audio context running after the first click, mute works, no page errors. Nobody has listened yet: ask the user how it sounds.
+- **Next:** M13 taunts: `T` or a small button opens 4-6 preset reactions (laugh, "yalla!", facepalm, "khalas", clap, 🔥), with a procedural sound each. Client sends `{t:'taunt', id}`; the Room validates the id, rate-limits (one per 2 s per player) and broadcasts `{t:'taunt', seat, id}`. Shown as a speech bubble (HTML positioned over the speaker's head via `camera.project`) for 2.5 s. Bots taunt sometimes after a kill. Demo mode shows yours locally.
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.

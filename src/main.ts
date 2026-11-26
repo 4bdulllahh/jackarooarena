@@ -8,6 +8,7 @@ import { Controls } from './scene/controls';
 import { buildMajlis } from './scene/majlis';
 import { Players } from './scene/players';
 import { Retro, snapVertices } from './scene/retro';
+import { isMuted, setMuted, sounds } from './scene/sound';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene')!;
 // antialias off: the low-res pixel look is the point, and it's cheaper on weak PCs.
@@ -28,6 +29,37 @@ const players = new Players(camera);
 scene.add(majlis.group, board.group, players.group, rig);
 snapVertices(scene);
 
+board.onLand = (_marble, final) => (final ? sounds.drop() : sounds.tick());
+board.onKill = () => sounds.clack();
+
+const muteButton = document.querySelector<HTMLButtonElement>('#mute')!;
+const showMute = () => {
+  muteButton.textContent = isMuted() ? 'Sound: off (M)' : 'Sound: on (M)';
+  muteButton.setAttribute('aria-pressed', String(isMuted()));
+};
+muteButton.onclick = () => {
+  setMuted(!isMuted());
+  showMute();
+};
+addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement || e.key.toLowerCase() !== 'm') return;
+  setMuted(!isMuted());
+  showMute();
+});
+showMute();
+
+/** Card flicks when cards leave hands or get dealt, and a chime when it becomes your turn. */
+let cardsHeld = -1;
+let wasMyTurn = false;
+function cardSounds(handSizes: number[], myTurn: boolean) {
+  const held = handSizes.reduce((a, b) => a + b, 0);
+  if (cardsHeld >= 0 && held < cardsHeld) sounds.flick();
+  if (cardsHeld >= 0 && held > cardsHeld) for (let i = 0; i < 6; i++) sounds.flick(i * 0.07);
+  cardsHeld = held;
+  if (myTurn && !wasMyTurn) sounds.ping();
+  wasMyTurn = myTurn;
+}
+
 // Camera poses, in your seat's frame. `V` switches between sitting and looking straight down.
 // Development only: `?cam=overview` (corner of the room), `?demo` (play seat 0 against bots
 // locally), `?demo=auto` (bots play every seat).
@@ -44,6 +76,7 @@ const target = POSES[pose].target.clone();
 addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement || e.key.toLowerCase() !== 'v') return;
   pose = pose === 'top' ? 'seat' : 'top';
+  sounds.whoosh();
 });
 
 function resize() {
@@ -98,6 +131,7 @@ const ui = startLobbyUi(document.querySelector('#lobby')!, {
     players.setCards(view);
     controls.setState(view.marbles, seat, view.plays);
     turn = view.winner === null ? view.turn : null;
+    cardSounds(view.handSizes, view.plays.length > 0);
   },
 });
 sendPlay = ui.play;
@@ -108,8 +142,13 @@ if (params.has('demo')) {
   const show = () => {
     board.setPositions(game.marbles);
     players.setCards({ hand: game.hands[0]!, handSizes: game.hands.map((h) => h.length), turn: game.turn });
-    controls.setState(game.marbles, 0, auto ? [] : legalPlays(game, 0));
+    const plays = auto ? [] : legalPlays(game, 0);
+    controls.setState(game.marbles, 0, plays);
     turn = game.turn;
+    cardSounds(
+      game.hands.map((h) => h.length),
+      plays.length > 0,
+    );
   };
   sendPlay = (play) => {
     game = applyPlay(game, 0, play, Math.random) ?? game;

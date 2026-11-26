@@ -146,7 +146,9 @@ export class Board {
   private positions: number[] = Array<number>(16).fill(BASE);
   private hops: Hop[][] = Array.from({ length: 16 }, () => []);
   /** Called with the marble number whenever a marble settles into a groove (for sounds later). */
-  onLand: (marble: number) => void = () => {};
+  onLand: (marble: number, final: boolean) => void = () => {};
+  /** Called the moment a killed marble is knocked off (when the killer lands). */
+  onKill: () => void = () => {};
 
   constructor() {
     const wood = new THREE.MeshLambertMaterial({ color: '#4a2c18' });
@@ -184,6 +186,7 @@ export class Board {
       else latest = Math.max(latest, this.queueMove(m, to, now));
     });
     for (const m of killed) this.queueMove(m, BASE, latest);
+    if (killed.length) setTimeout(() => this.onKill(), latest - now);
   }
 
   /** Queue a marble's hops after `after`; returns when it lands. */
@@ -232,7 +235,7 @@ export class Board {
       mesh.position.y += Math.sin(t * Math.PI) * hop.height;
       if (t === 1) {
         queue.shift();
-        this.onLand(m);
+        this.onLand(m, queue.length === 0);
       }
     });
   }
