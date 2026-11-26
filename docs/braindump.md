@@ -28,8 +28,9 @@ Status: kickoff done, plan approved. Work continues from handover.md.
 8. **Deck:** one standard 52-card deck, no jokers. Deal 4, 4, then 5 cards (3 rounds = 52).
    Then reshuffle.
 9. **Turn order:** counterclockwise, the next turn is always the player to the right
-   (P1, P2, P3, P4). Each new deck is started by the next player: deck 1 by P1, deck 2 by P2,
-   and so on.
+   (P1, P2, P3, P4). The dealer moves one seat every deal: P1 deals to P2 and P2 starts, then
+   P2 deals and P3 starts, and so on (an anti-cheating custom: the next person gets the cards
+   first and starts).
 10. **Shuffling:** fully random, done on the server.
 11. **Cards:**
     - **A:** take a marble out, or move 1, or move 11.
@@ -142,6 +143,9 @@ Status: kickoff done, plan approved. Work continues from handover.md.
 50. **Edge cases (confirmed after M2):** a K kills a marble standing on its home entrance and
     enters home. A 5 sends your own or partner's marble into home and an opponent's past it,
     no choice. A 5's jump limits use the moved marble's colour.
+51. **Red 10 / red Q burns are the victim's whole turn:** they lose the card and play passes
+    to the player after them.
+52. **7 split:** if the first part brings your 4th marble home, the rest moves a partner marble.
 
 Logo references: `docs/reference/logo-meme-layout.png`, `docs/reference/logo-meme-expressions.png`.
 

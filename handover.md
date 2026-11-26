@@ -39,6 +39,8 @@ Skills live in `.claude/`, which is gitignored. On a new PC, reinstall them from
 | `src/domain/` | Pure game logic shared by client and server, fully tested (`*.test.ts` next to the code) |
 | `src/domain/board.ts` | Board constants: track 0..71, start = p*18, home entrance = start - 2 (tile 17), positions (`BASE` = -1, `HOME` + 0..3) |
 | `src/domain/move.ts` | `moveMarble` (normal and backward moves), `kingMove`, `exitMarble`, `fiveEntersHome`. Each returns new positions or `null` when illegal |
+| `src/domain/cards.ts` | Cards as ids 0..51 (`rankOf`, `suitOf`, `isRed`, `cardName`), shuffling |
+| `src/domain/game.ts` | Whole game: `newGame`, `legalPlays(game, player)`, `applyPlay(game, player, play, random)` (null = illegal), `viewFor` (what one player may see). Plays: exit, move, king, split, swap, burnNext (red 10), pickNext (red Q), burn, pickBurn |
 | `src/main.ts` | Client entry: three.js scene (placeholder board until M8) |
 | `server/index.ts` | Worker: `/api/health`, `POST /api/rooms` (new code), `/api/rooms/:code` (asks the `Room` Durable Object) |
 | `wrangler.jsonc` | Worker config: static assets, SPA fallback for room links, `ROOMS` Durable Object binding |
@@ -67,8 +69,8 @@ browser and take a screenshot.
 | --- | --- | --- | --- |
 | M1 | Setup: Vite + three.js + TS, Worker + Durable Object skeleton, CI, docs | S | ✅ done |
 | M2 | Rules engine 1: 72-tile board, base, home lane, movement, jump limit, kills, invincible start, home entrance block | M | ✅ done |
-| M3 | Rules engine 2: all cards (7 split, 5, red 10/J/Q, K), burn/pass, deal 4-4-5, turn order, teams, win | M | next |
-| M4 | Bots: legal moves, prefer kills and sabotage | S | |
+| M3 | Rules engine 2: all cards (7 split, 5, red 10/J/Q, K), burn/pass, deal 4-4-5, turn order, teams, win | M | ✅ done |
+| M4 | Bots: legal moves, prefer kills and sabotage | S | next |
 | M5 | Flat 2D debug board, play a full game to check rules | S | |
 | M6 | Online rooms: create/join by code or link, name, pick seat/team, host starts, bots fill seats | M | |
 | M7 | Online play: hidden hands, network moves, reconnect, 15 s turn timer then bot plays, rematch | M | |
@@ -88,12 +90,13 @@ browser and take a screenshot.
 | Milestone | Size | Usage before | Usage after |
 | --- | --- | --- | --- |
 | M1 | S | 9% | 10% |
-| M2 | M | 10% | ? |
+| M2 | M | 10% | 13% |
+| M3 | M | 13% | ? |
 
 ## Current state
 
-- **Last done:** M2. Board model and movement rules in `src/domain/board.ts` and `move.ts`, 31 tests from the user's own examples (jump limit, invincible start, K path kill, leaving base, 4-back shortcut, forced home entry, entrance block, 5 by partner vs opponent).
-- **Next:** M3. Cards and turns in `src/domain/`: map each card to the moves in `move.ts` (A, 2-9, 4 back, 5 on any marble, 7 split, black/red 10/J/Q, K), list legal plays per hand, burn and pass, a full game state (deck, deal 4-4-5, turn order, who starts each deck, teams, finished players moving their partner's marbles, win).
+- **Last done:** M3. Every card, burn and pass, red 10 (victim burns, that's their turn), red Q (blind pick, that's the victim's turn), 7 split incl. leftover to partner, finished players moving their partner, dealer rotating every deal (next player starts), fresh deck after 4-4-5, team win. 56 tests, including 30 random full games checking cards are conserved, one marble per tile and hands stay private. Random play always reaches a winner (about 590 turns).
+- **Next:** M4 bots in `src/domain/bot.ts`: `botPlay(game, player, random): Play` picks from `legalPlays`. Prefer: win, enter home, kill opponents (more if near their home), exit marbles, sabotage (5 pushing opponents past home, 5 pushing partner in, red J/Q/10), avoid killing own/partner, burn the least useful card. Test: bots beat random players most of the time.
 - **Open questions:** none. Confirmed by the user after M2: a K kills a marble on its home entrance and enters; a 5 sends own/partner marbles into home and opponents' past it (no choice); a 5's jump limits use the moved marble's colour.
 - **Known issues:** client bundle is 530 kB (three.js imported whole, 131 kB gzipped), fine for now. npm blocked esbuild's postinstall script (`npm approve-scripts`); builds work without it.
 - **Not pushed:** the M2 commit.
