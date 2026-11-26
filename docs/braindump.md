@@ -56,6 +56,10 @@ Status: kickoff done, plan approved. Work continues from handover.md.
 
 14. **Style:** Buckshot Roulette's retro PS1/CRT low-poly look (not a copy), but the mood is
     the opposite: a chill, warm, well-lit Arab majlis with a chandelier.
+    **Changed after M14:** the 240-line look was too pixelated ("the vibes, not the actual
+    super low res"). The game renders at full resolution with a soft CRT filter (scanlines,
+    dither, grain, vignette), real lighting and shadows, detailed models, no vertex wobble,
+    and Low/Medium/High graphics settings, at 60 fps.
 15. **Chaos mode mood (later):** dark, thunder outside, lights off, one lamp over the table.
 16. **Setting:** players sit cross-legged on the floor at a low table, legs slid under it.
     Each player has a side snack tray: green tea, sunflower seeds, chips, water.
